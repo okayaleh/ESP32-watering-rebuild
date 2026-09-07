@@ -36,8 +36,9 @@ The baseline is the supplied [rebuild prompt](https://github.com/supercrossed/ES
 | Config import/export, WiFi updates, reboot | Application/API/dashboard | Implemented; no credential export |
 | Browser weather | Dashboard | Implemented; optional external fetch, independent of watering |
 | Multipart code upload | Web/updater/dashboard | Implemented; staged, protected names, explicit apply |
-| Hash-based manifest OTA and changed-file downloads | `updater.py` | Implemented; HTTP mirror, per-file paths and readback hashes |
-| Automatic checks/install option | Runtime/config | Implemented; automatic install off by default |
+| Hash-based manifest OTA and changed-file downloads | `updater.py` | Implemented; verified GitHub HTTPS, immutable commit paths, platform checks, readback hashes and optional LAN mirror |
+| Automatic checks/install option | Runtime/config | Implemented; daily idle-time installation enabled in fresh configurations, catch-up/retry, manual opt-out and rollback hold |
+| Retained compatible release selection | Updater/dashboard/release channel | Added; current and up to two prior channel releases, with older ZIP archives retained separately |
 | Boot-count rollback | `boot.py`, updater | Implemented; journal also handles interrupted commit, additions and deletions |
 | Nightly maintenance reboot | Runtime/config | Implemented; disabled by default; only idle after1h uptime |
 | Precompiled build, scrubbed config, manifest | `tools/build.py` | Implemented; immutable boot excluded from OTA |

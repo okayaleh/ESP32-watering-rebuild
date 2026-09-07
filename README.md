@@ -6,7 +6,7 @@ A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.
 
 ## Project status
 
-The current application is **2.0.0-rebuild.3**, a **prerelease** adding dashboard dark mode and the GPIO2 RGB status colors. See the [release notes](docs/releases.md) for changes and the one-time RGB configuration step on existing installations. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
+The current application is **2.0.0-rebuild.4**, a **prerelease** adding independent GitHub updates over verified HTTPS, automatic idle-time installation and selection of retained compatible releases. Dashboard dark mode and GPIO2 RGB status colors remain included. See the [release notes](docs/releases.md) for the one-time upgrade from earlier versions. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
 The previous application, **2.0.0-rebuild.2**, was installed on a classic ESP32-D0WD-V3 with 4 MB flash. Its validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. That bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**. Current release checks and the distinction from earlier hardware measurements are recorded in the [validation report](docs/validation.md).
 
@@ -25,7 +25,7 @@ The installed bench board has both automatic watering modes disabled. **Fresh ap
 | RGB status LED | GPIO2 addressable RGB: green connected, blue watering, yellow disconnected, white setup/rescue hotspot |
 | Networking | Bounded nonblocking HTTP, DNS, NTP and update transfers; Wi-Fi retry/backoff, setup/rescue hotspot and gateway health checks |
 | Configuration | Validated settings, rename propagation, import/export, separate credentials and migration support for the original project |
-| Updates | Hashed manifests, staged uploads, transactional installation, failed-boot recovery and selectable archived releases |
+| Updates | Direct GitHub HTTPS, automatic daily checks and idle-time installation, retained release selection, hashed manifests, transactional installation and failed-boot recovery |
 | Development | Precompiled application build, local simulator, fault tests, GitHub validation and tag-driven releases |
 
 Flow-meter pin and volume fields are preserved as configuration groundwork, but watering is **timed**: flow pulse counting is not implemented. Rain is **display-only** and does not suppress watering. These functions were also groundwork in the original. The [feature checklist](docs/feature-parity.md) maps the original functions to the rebuild and documents deliberate behavior changes.
@@ -40,7 +40,7 @@ The repository's **[Documents section](docs/README.md)** is the entry point for 
 | [Hardware and wiring](docs/hardware.md) | Valve drivers, flyback protection, pin assignments, ADC addressing and board profiles |
 | [Troubleshooting](docs/troubleshooting.md) | Hotspot passwords, Google mesh, connection diagnostics, startup and recovery |
 | [Commissioning](docs/commissioning.md) | Physical checks and network soak required before unattended watering |
-| [Updates and rollback](docs/ota.md) | Publish releases, retain earlier updates, run the laptop mirror and recover |
+| [Updates and rollback](docs/ota.md) | Standalone GitHub updates, previous releases, optional LAN mirror and recovery |
 | [Release notes](docs/releases.md) | Version changes and upgrade compatibility |
 | [HTTP API](docs/api.md) | Routes, request formats, limits, errors and control behavior |
 | [Architecture](docs/architecture.md) | Control loop, persistence, networking, memory and failure handling |
@@ -90,7 +90,7 @@ explains the four steady LED colors and their priority.
 | `settings.json` on the board | Authoritative saved zones, valves, schedules and runtime settings | No |
 | `wifi.json` on the board | Saved home Wi-Fi credentials; takes precedence over config defaults | No |
 | `watering_state.json` on the board | Watering intent, schedule occurrences and cooldowns | No |
-| `config.py` on the board | First-boot defaults and local options such as board type, watchdog, hard cutoff and update mirror | No |
+| `config.py` on the board | First-boot defaults and local options such as board type, watchdog, hard cutoff and update source | No |
 | `boot.py` and `romboot.py` | Recovery and ROM cache boot helpers | No; USB maintenance only |
 | Manifest-listed application files | Compiled modules, entrypoint, dashboard and version | Yes |
 
@@ -100,23 +100,15 @@ After first boot, editing a default zone in `config.py` does not replace saved r
 
 [GitHub Releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases) retain the **current update and at least two previous updates** as releases accumulate. Older releases and local download caches are kept too; there is no automatic pruning. Published release tags and assets are protected by GitHub release immutability. The first published application is `v2.0.0-rebuild.2`; earlier recovery choices appear as actual subsequent versions are released.
 
-List the newest three available choices from an extracted package or repository checkout:
+From .4 onward, the controller downloads compatible application releases directly from GitHub over certificate-verified HTTPS. Connect it to home Wi-Fi with internet access and allow its clock to synchronize. **A laptop, USB connection and GitHub account are unnecessary for normal updates.** External power works the same way as USB power.
 
-```powershell
-python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --list
-```
+Fresh configurations enable daily checks and installation at **04:00 controller local time**, with catch-up after reconnection. Updates wait for idle watering and pause new runs until the update completes. In **Maintenance → Firmware updates**, the dashboard shows the update source, installed version and automatic mode. A manual **Check for updates** requires an explicit **Install update** afterward.
 
-Download a specific release, verify its archive and application hashes, and serve it from the laptop:
+The channel keeps the current compatible release and up to two predecessors. **Choose a retained release** checks a selected older version before installation. A deliberate rollback pauses automatic updates until the latest release is selected and installed. Failed-boot versions are excluded from retry. The channel begins with .4; older .2/.3 archives remain available through USB or the optional LAN mirror, and do not appear in the standalone selector.
 
-```powershell
-$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.3
-if ($LASTEXITCODE -ne 0) { throw "Release verification failed" }
-python tools/mirror.py --directory "$releaseRoot" --port 8000
-```
+For an existing .2/.3 controller, install .4 once over USB or the existing mirror and update its local configuration as described in the [complete update guide](docs/ota.md). Application OTA preserves `config.py`, including an existing automatic-install opt-out or mirror URL. It also preserves Wi-Fi credentials, garden settings and schedules. Native platform and boot-helper changes still require USB maintenance.
 
-Set `UPDATE_BASE_URL` in the board's local `config.py` to the laptop's trusted LAN HTTP address, for example `http://192.168.1.50:8000`. For an installed controller, save that file over USB with valve power disconnected and reboot to load the new address. Then use **Check for update** in the dashboard, review the displayed version and apply while watering is idle. The base URL is blank by default, so the mirror must be configured before this works. Keep the laptop and mirror running through installation; direct GitHub HTTPS URLs are not supported by the board updater.
-
-To revert, select a retained older tag that worked on your controller and use the same process. Check that its application is compatible with the saved settings and native firmware. Repository archives provide multiple selectable versions; the board's transaction recovery keeps one previous set of changed files, not two complete permanent installations. A successful boot trial measures safety-loop startup, not long-term field reliability. Follow the [complete update and recovery guide](docs/ota.md) for compatibility limits and interrupted-update behavior.
+Repository archives provide multiple recovery choices; the board retains one previous set of changed application files for interrupted-update and failed-boot recovery. Check compatibility before choosing an older release. A successful boot trial establishes startup of the safety loop, not long-term field reliability.
 
 ## Build and validate
 
@@ -126,7 +118,7 @@ Use Python 3.10+ and Node.js 22+. From a new checkout:
 git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
 cd ESP32-watering-rebuild
 python -m pip install -r requirements-dev.txt
-python tools/build.py --version 2.0.0-rebuild.3
+python tools/build.py --version 2.0.0-rebuild.4
 python tools/check.py
 ```
 
@@ -172,7 +164,7 @@ Local tools, credentials, device backups, logs and test output are ignored by Gi
 
 Report reproducible problems in [Issues](https://github.com/okayaleh/ESP32-watering-rebuild/issues), including the application version, exact board, relevant event messages and steps to reproduce. Remove passwords and private network details from shared logs.
 
-For changes, run the build and host checks, update the relevant documents and record any physical validation. GitHub also validates pushes and pull requests. A maintainer publishes an update by pushing a new `v<version>` tag; the release workflow builds, checks and packages that tag, then publishes immutable assets. Versions containing a hyphen are prereleases. Never reuse a published tag; see the [release procedure](docs/ota.md#publish-and-select-a-github-release).
+For changes, run the build and host checks, update the relevant documents and record any physical validation. GitHub also validates pushes and pull requests. A maintainer publishes an update by pushing a new `v<version>` tag; the release workflow builds, checks and packages that tag, then publishes immutable assets and advances the standalone update channel to verified application files at an immutable commit. Versions containing a hyphen are prereleases. Never reuse a published tag; see the [release procedure](docs/ota.md#publish-and-select-a-github-release).
 
 ## License and attribution
 

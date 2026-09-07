@@ -209,7 +209,14 @@ class APIRouter:
         elif path == "/api/water/stop":
             result = app.stop_all()
         elif path in ("/api/update/check", "/api/update/apply"):
-            result = app.update_action(path.rsplit("/", 1)[1])
+            action = path.rsplit("/", 1)[1]
+            version = body.get("version")
+            if version is not None:
+                if action != "check" or not isinstance(version, str) or not 0 < len(version) <= 64:
+                    raise ValueError("A release version is valid only when checking updates")
+                result = app.update_action(action, version=version)
+            else:
+                result = app.update_action(action)
         elif path == "/api/reboot":
             result = app.reboot()
         return {"ok": True} if result is None else result

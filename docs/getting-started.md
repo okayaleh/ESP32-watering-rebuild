@@ -106,6 +106,6 @@ The status page shows startup grace, clock, sensor errors, queue, watering state
 
 ## Install future updates or revert
 
-Use the [update and recovery guide](ota.md). Public release downloads need no GitHub token. The laptop verifies the selected release and serves its application files over a trusted LAN HTTP mirror; the board installs only after an explicit dashboard action unless local automatic-install settings were deliberately changed.
+Use the [update and recovery guide](ota.md). From .4 onward, the controller downloads compatible releases directly from GitHub over verified HTTPS with no laptop or token. Home Wi-Fi, internet access, a synchronized clock and reliable power are required. Fresh configurations enable daily automatic installation at 04:00 controller time, waiting for idle watering. Manual checks and retained-release selections wait for an explicit Install action. Existing local configuration is preserved; the guide explains the one-time upgrade from .2/.3, automatic-install opt-out and optional LAN mirror.
 
 The repository keeps the current release and at least two earlier updates as versions accumulate, with older history retained too. Keep a record of which tag worked on your own hardware. An archived release is a selectable recovery option, not proof of compatibility with every later settings format or platform image.

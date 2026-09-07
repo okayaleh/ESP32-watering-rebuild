@@ -22,7 +22,7 @@ class MaintenanceSafetyTests(unittest.TestCase):
     def test_check_pauses_starts_before_staging(self):
         app, actions = self.make()
         app.update_action('check')
-        self.assertEqual(actions, [('check', True)])
+        self.assertEqual(actions, ['closed', ('check', True)])
         self.assertTrue(app.controller.paused)
     def test_credentials_write_follows_output_closure(self):
         app, actions = self.make(False)

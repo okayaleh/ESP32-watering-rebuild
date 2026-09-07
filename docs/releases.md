@@ -3,6 +3,47 @@
 [Documents](README.md) · [Updates and rollback](ota.md) ·
 [All GitHub releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases)
 
+## 2.0.0-rebuild.4 — independent GitHub updates
+
+- The ESP32 can fetch application updates directly from the public GitHub
+  repository over HTTPS with certificate, hostname and date verification.
+  No laptop, USB connection or GitHub account is needed for normal updates.
+- The release channel points to bounded manifests and flat files at immutable
+  commit SHAs. Sizes, SHA-256 hashes and native-platform compatibility are
+  checked before installation; redirects and unverified TLS are rejected.
+- Fresh configurations enable daily automatic checks/installations at 04:00
+  controller local time, with catch-up and retry. Checks wait for home Wi-Fi,
+  synchronized time and idle watering. New watering pauses during maintenance.
+- Manual checks and uploads always wait for explicit installation. The
+  dashboard explains the source, version, automatic mode, failures and any
+  deliberate rollback hold.
+- Up to three compatible channel releases support manual version selection.
+  Choosing an older release pauses automatic upgrades; a failed-boot release
+  is excluded from future attempts. The transactional recovery and ROM cache
+  retain their existing behavior.
+- Dark mode, RGB status colors, Wi-Fi credentials, garden settings and
+  schedules are preserved. The native platform and USB boot helpers are
+  unchanged; those parts remain USB maintenance only.
+
+### Upgrade from .2 or .3
+
+Use USB or the existing LAN mirror once to install .4. Existing local
+`config.py` is protected from OTA. Configure `UPDATE_GITHUB_REPO`, clear any
+`UPDATE_BASE_URL`, set `UPDATE_AUTO_INSTALL = True` if desired and restart;
+see the exact [one-time upgrade steps](ota.md#one-time-upgrade-from-2-or-3).
+Keeping automatic installation off remains supported.
+
+The standalone channel begins with .4 because earlier manifests do not
+include the required platform metadata. The .2 and .3 release archives are
+retained for USB/mirror recovery. Reverting to either removes direct GitHub
+updating until .4 or later is installed again. More dashboard recovery choices
+appear as actual compatible releases are published.
+
+The [validation report](validation.md) separates host checks from physical
+ESP32 testing. Hardware TLS transfer, update/reboot, memory and network
+acceptance must be recorded before claiming this version was verified on a
+particular board.
+
 ## 2.0.0-rebuild.3 — dark mode and RGB status
 
 - Dashboard light/dark toggle in the header, with the initial theme following
@@ -24,7 +65,7 @@
 
 The application update uses the existing platform image, boot helpers and
 settings format. No native firmware reflash is needed. Follow the normal
-[release download and laptop mirror procedure](ota.md).
+[application update procedure](ota.md).
 
 **Existing `config.py` is preserved by OTA.** If the controller was configured
 for a plain LED, edit its on-board `config.py` over USB with valve power

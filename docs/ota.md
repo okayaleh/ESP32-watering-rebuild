@@ -1,102 +1,154 @@
 # Firmware updates and recovery
 
-Commission this rebuild over USB first, including `boot.py`, `romboot.py` and
-the correct platform image. The old
-project's updater and recovery marker are not a migration mechanism for this
-replacement. Export settings and keep a copy of the old device files before
-commissioning.
+From **2.0.0-rebuild.4**, the controller can check and install application
+releases directly from GitHub over verified HTTPS. It needs home Wi-Fi with
+internet access, a synchronized clock and reliable power. **No laptop,
+USB connection, GitHub account or token is needed during normal updates.**
+The setup hotspot alone does not provide internet access.
+
+The native MicroPython image and USB boot helpers remain separate. Install
+this rebuild over USB first; the original project's updater cannot migrate
+it. Back up device files and export settings before initial installation or
+recovery. An existing .2/.3 rebuild needs the one-time upgrade below.
+
+## Normal standalone updates
+
+Open **Maintenance → Firmware updates** in the dashboard. The card shows the
+installed and selected versions, source, last check/install, automatic mode
+and any failure. Choose **Check for updates** to check the newest release.
+A manual check does not install it: review the selected version, then choose
+**Install update** and keep the controller powered through its restart.
+
+Fresh .4 configurations enable an automatic check and installation at
+**04:00 controller local time**, using the fixed UTC offset in watering
+settings. The controller catches up after boot or reconnection and retries
+failed checks after five minutes, then every thirty minutes if failures
+continue. It waits at least sixty seconds after startup, for synchronized
+time and for idle watering before
+starting, then pauses new watering during the update. Automatic installation
+only follows an automatic check; a manually selected release or uploaded
+bundle waits for the explicit Install action.
+
+A Wi-Fi or download failure leaves the running installation available. The
+controller reports the error and can retry later. Do not repeatedly restart
+the board to force a check. If a firmware version fails its boot trial, that
+version is excluded from later automatic and manual installation; publish a
+new corrected version. See [troubleshooting](troubleshooting.md#firmware-updates).
+
+### One-time upgrade from .2 or .3
+
+Those versions only understand a LAN HTTP mirror. Install .4 once using its
+verified release files over USB, or use the optional mirror procedure below
+with the .4 release. No native platform reflash or erase is required for a
+controller already running the supplied .2/.3 platform.
+
+OTA preserves local `config.py`, so save these values to the board over USB
+and restart if they differ from the desired settings:
+
+```python
+UPDATE_GITHUB_REPO = "okayaleh/ESP32-watering-rebuild"
+UPDATE_BASE_URL = ""  # Empty selects direct GitHub updates.
+UPDATE_CHECK_HOUR = 4
+UPDATE_AUTO_INSTALL = True
+UPDATE_TIMEOUT_SEC = 120
+```
+
+Set `UPDATE_AUTO_INSTALL = False` to keep manual installation. An existing
+`False` value is preserved by an application-only update. A nonempty
+`UPDATE_BASE_URL` continues to select the optional LAN mirror. Editing a
+laptop copy does not change a running board; save the on-board file and reboot.
+Keep valve supply power disconnected during USB maintenance. Garden settings,
+schedules and Wi-Fi credentials are separate and remain preserved.
+
+## Select a previous application version
+
+After a successful GitHub check, **Choose a retained release** offers other
+compatible channel versions, up to two prior releases alongside the current
+release. Select one previously tested on your controller, use **Check selected
+release**, verify the displayed version and choose **Install update**.
+Checking a selection does not install it or change watering configuration.
+
+A deliberate older-version installation pauses automatic updates so the
+controller stays on that release. To resume, check and install the latest
+channel release. The dashboard reports the hold. Update policy is retained
+separately from application files in `.ota-policy.json`.
+
+The standalone channel starts at .4. Older .2/.3 archives remain available
+for supervised USB or mirror restoration, but their manifests do not declare
+the platform compatibility required by the standalone channel and they do not
+appear in its selector. Installing either removes standalone updating until
+.4 or later is installed again. Fewer dashboard choices appear until more
+compatible releases have actually been published.
+
+A previous application must remain compatible with saved settings, the
+native platform and boot helpers. Reverting application files does not revert
+settings or remove files absent from an older manifest. The board's automatic
+recovery keeps one previous set of changed files; repository retention
+provides the additional selectable versions. A passed boot trial verifies
+startup of the safety loop, not long-term field reliability.
 
 ## Publish and select a GitHub release
 
-The public update repository is `okayaleh/ESP32-watering-rebuild`. Its
-`v*` tag workflow builds the tagged application with the pinned compiler,
-runs host checks, and publishes `planter-<version>.zip` plus its `.sha256`
-file. For example, tag version `2.0.0-rebuild.3` as `v2.0.0-rebuild.3`.
-Tags whose version contains a hyphen are published as prereleases. The ZIP
-also includes the existing platform image for supervised USB installation;
-this workflow does not rebuild or install that platform image.
+The public repository is `okayaleh/ESP32-watering-rebuild`. Its `v*` tag
+workflow builds the tagged application, runs host checks and publishes
+`planter-<version>.zip` plus `.sha256`. Tag application `2.0.0-rebuild.4` as
+`v2.0.0-rebuild.4`. Hyphenated versions are prereleases; this project's update
+channel intentionally includes the published rebuild prereleases.
 
-Release retention keeps the current update and at least two previous updates
-once those versions have been published. Older releases, tags, assets and
-downloaded caches are retained too; there is no automatic deletion.
-The workflow uploads assets to a draft before publishing the release. A
-failed upload leaves the draft for review; it does not replace existing
-release assets. Publish a new version tag for each update rather than reusing
-a published tag.
+The workflow also publishes the small `channel.json` document at the root of
+the `updates` branch. The board reads it from `raw.githubusercontent.com` and
+selects the newest compatible entry or an explicitly requested retained
+version. Each entry points to a full immutable commit SHA containing the
+manifest and flat application files. The board does not download a ZIP,
+follow release-asset redirects, or query the GitHub API.
 
-List the newest published update and two previous available choices:
+The channel holds at most three compatible entries: current and the previous
+two. Older GitHub releases, tags and assets remain retained; there is no
+automatic archive pruning. Published release tags and assets are immutable.
+Upload assets to a draft before publishing, never replace an existing release
+or reuse its tag, and keep channel publication ordered after validation.
+The packaged native image is for USB maintenance; publication does not
+rebuild or remotely flash that image.
+
+For development or archive recovery, list the newest three published ZIPs:
 
 ```powershell
 python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --list
 ```
 
-The list includes clearly marked prereleases and skips drafts, unrelated
-releases and incomplete package assets. It orders eligible releases by
-publication date. Listing checks release metadata; downloading performs the
-archive and payload hash verification. Availability does not mean a version
-was tested successfully on your controller. Fewer choices appear until three
-eligible updates have been published.
+This list includes older mirror-compatible archives as well as standalone
+releases. It orders eligible packages by publication date and skips drafts
+and incomplete assets. Listing metadata is not payload verification; the
+download command below verifies the archive and application files.
 
-GitHub serves releases over HTTPS. This controller's updater requires a
-trusted LAN HTTP mirror, so the laptop downloads and verifies a selected
-release first. From the repository directory:
+## Optional LAN mirror and archived releases
+
+The mirror remains useful for a local build, restricted internet access or
+restoring a release older than .4. It requires a running reachable computer
+through installation; the controller need not be attached to that computer
+by USB. Public downloads need no GitHub token.
 
 ```powershell
-$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.3
+$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.4
 if ($LASTEXITCODE -ne 0) { throw "Release download or verification failed" }
 python tools/mirror.py --directory "$releaseRoot" --port 8000
 ```
 
-The sync command requires an explicit tag, including for prereleases. It
-checks the archive SHA-256 and every OTA file's manifest size and hash, then
-creates `.tools/updates/<owner>/<repository>/<tag>/<archive-sha256>/build/`.
-Only the manifest and allowed OTA artifacts enter this cache. Local config,
-credentials, boot helpers and the native platform image are never mirrored.
-No GitHub token is needed to download public release assets.
+The helper checks the archive SHA-256 and each manifest-listed file's size
+and hash, then writes an immutable, hash-addressed local cache. Only allowed
+application artifacts are served, excluding configuration, credentials, boot
+helpers and the native platform image. Finish any active update and stop the
+mirror before starting one pinned to a different release directory.
 
-Each mirror stays pinned to the directory passed at startup. Finish any
-controller update and stop that mirror before starting one for a different
-release. Downloading another release preserves existing cache directories;
-a changed or damaged existing cache is rejected rather than overwritten.
-Use the same laptop HTTP URL below for both local builds and downloaded
-releases. Direct GitHub URLs cannot be used as `UPDATE_BASE_URL`.
-
-## Select a previous application version
-
-1. Run the `--list` command above and choose a tag you previously tested
-   successfully on this controller. Check that release's platform and settings
-   compatibility before reverting.
-2. Finish any active update and stop the laptop mirror. Run the download
-   command above with the selected older `--tag`, then start the mirror using
-   its returned directory. Any retained tag can be selected, including tags
-   older than the three displayed choices.
-3. In the dashboard, use **Check for update**, confirm the displayed version
-   matches the chosen tag, then install while watering is idle. Verify the
-   controller after it restarts.
-
-This selects older application files; it does not restore older settings or
-replace the native platform/USB boot helpers. Files introduced by a newer
-version but absent from an older manifest also remain on the device. Choose
-an application release compatible with those files and the saved settings;
-native firmware, boot-helper or incompatible settings-schema changes require
-an explicit migration or USB recovery procedure. Repository retention is separate
-from the board's automatic recovery: the board keeps one previous installation
-for its interrupted-update and failed-boot recovery mechanism. The laptop and
-repository retain the additional selectable versions.
-
-## Serve this build on your LAN
-
-From the repository directory, build and start the restricted mirror:
+For an unpublished local build, use:
 
 ```powershell
-python tools/build.py --version 2.0.0-rebuild.3
+python tools/build.py --version 2.0.0-rebuild.4
 python tools/mirror.py --port 8000
 ```
 
-The mirror serves only `build/manifest.json` and the artifacts listed in it.
-It does not serve `config.py`, WiFi credentials, arbitrary repository files or
-the immutable boot guard. Set these first-boot/local configuration values on
-the ESP32, replacing the example IP with the computer's LAN address:
+Set the board's local options to the computer's trusted LAN address and
+restart after saving:
 
 ```python
 UPDATE_BASE_URL = "http://192.168.1.50:8000"
@@ -104,22 +156,11 @@ UPDATE_MANIFEST_PATH = "build/manifest.json"
 UPDATE_AUTO_INSTALL = False
 ```
 
-For an already-installed controller, edit its on-board `config.py` over USB
-with valve power disconnected, save the file and reboot. The updater reads
-these options at startup; changing a laptop copy or saving without a reboot
-does not change the running updater's address.
-
-Allow the mirror port through the computer's firewall for the private LAN.
-Keep the computer and mirror running until installation completes. A hostname
-also works through the controller's asynchronous DNS resolver. The URL must
-point to this rebuild's artifacts, not the original repository's manifest.
-
-Use **Check for update** in the dashboard, review the version and file list,
-then install while watering is idle. Daily checks use `UPDATE_CHECK_HOUR`;
-automatic installation remains off by default. The installed version comes
-from `version.json`. Check timestamps are held in RAM; the last installation
-timestamp is retained in the recovery journal. Timestamps require a correct
-device clock to be meaningful.
+Allow the port through the computer's private-network firewall. Check the
+release in the dashboard and install while idle. Choose an explicit older
+`--tag` for an archived recovery version; any retained compatible tag can be
+downloaded, including one older than the three listed choices. Clear
+`UPDATE_BASE_URL` and restart to restore direct GitHub mode on .4 or later.
 
 ## What installation does
 
@@ -164,9 +205,13 @@ this flat filesystem design.
 
 ## Limits and assumptions
 
-- Plain HTTP is required. Responses must be HTTP 200 with one valid
-  `Content-Length`. HTTPS, redirects, chunked responses and unbounded lengths
-  are rejected. The supplied mirror returns the required headers.
+- Direct GitHub transfers use HTTPS to the configured repository on
+  `raw.githubusercontent.com`. TLS requires certificate-chain, hostname and
+  date validation against the bundled trusted roots; checks wait for clock
+  synchronization. A verification failure is an error, never a fallback to
+  unverified TLS. The optional mirror uses plain HTTP. Both transports require
+  HTTP 200 and one valid `Content-Length`; redirects, chunked responses and
+  unbounded lengths are rejected.
 - Sockets remain nonblocking, with at most 512 bytes sent or received per
   polling step and an absolute deadline per transfer. Network code never feeds
   the watchdog. Hardware/driver stalls remain subject to the watchdog and
@@ -189,10 +234,13 @@ this flat filesystem design.
   use a compatible MicroPython firmware and compiler. The minor version is
   relevant to native code; see the official
   [MicroPython bytecode compatibility documentation](https://docs.micropython.org/en/latest/reference/mpyfiles.html).
-- SHA-256 proves the transfer matches its manifest; it does not authenticate
-  the publisher. A malicious HTTP mirror or LAN attacker could change both.
-  Keep the dashboard and mirror on a trusted network and do not port-forward
-  them. Signed release manifests are not implemented.
+- GitHub TLS authenticates the download host, and immutable commit paths plus
+  SHA-256/size checks bind files to the selected manifest. The manifest also
+  declares the required platform and native-image hash. This trusts the
+  configured GitHub repository and certificate authorities; signed manifests
+  are not implemented. A malicious plain-HTTP mirror or LAN attacker could
+  alter both a mirror manifest and its files. Keep the dashboard and any
+  optional mirror on a trusted network without port forwarding.
 - Recovery assumes a functioning flash filesystem with atomic rename and
   working `os.sync()` semantics. It does not repair physical flash damage,
   power-rail failures, a welded valve or a failed MOSFET. Hardware bias that keeps each driver inactive,

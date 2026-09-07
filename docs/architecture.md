@@ -24,6 +24,31 @@ The dashboard serializes **all** fetches through one promise queue, including ac
 
 Listener health distinguishes fatal `accept()` errors from EAGAIN and retries an invalid listener after30s. Last accept/response times, counters and errors are exposed. An idle listener is not labeled “reachable”: end-to-end reachability remains explicitly unverified. The original project reproduced intermittent stalls below the application in MicroPython/lwIP, so listener recreation is not claimed to cure that fault. Establish behavior on the actual firmware/router with the commissioning soak test.
 
+## Standalone GitHub updates
+
+The update channel is a bounded JSON document on the repository's `updates`
+branch. Each of at most three entries binds a release version to immutable
+commit paths. The board downloads a manifest and flat files directly from
+`raw.githubusercontent.com`, avoiding GitHub API calls, ZIP extraction and
+release-asset redirects. Manifest platform identity and native-image hash
+must match the installed platform before staging.
+
+The HTTPS state machine uses nonblocking sockets, a required certificate
+chain, SNI/hostname checks and a synchronized clock. It streams bounded
+chunks under an absolute transfer deadline. Trust roots are bundled in the
+application and can be refreshed by a compatible verified update. Failed
+verification never disables certificate checks or falls back to HTTP.
+Plain HTTP remains an explicit local-mirror configuration only.
+
+Automatic checks wait for connected Wi-Fi, valid time and idle watering,
+catch up after boot/reconnection and retry failures. Only a successful
+automatic check can lead to automatic installation. Manual release checks
+and uploads require explicit apply. A durable update policy preserves a
+chosen older release by holding automatic upgrades, and excludes versions
+which failed a boot trial. Installing the latest selected channel release
+clears a deliberate hold. Existing transactional file recovery and ROM cache
+bank switching remain authoritative after installation.
+
 ## Storage, sensors and memory
 
 Small JSON writes use temp files, flush/sync, readback verification and a previous generation. A corrupt current file cannot overwrite its only good backup during repair. Settings changes copy incoming request values into a private candidate; persistence takes ownership of that candidate without another full-tree clone. Public save calls still defensively copy their inputs. This reduces peak allocation during a maximum-configuration save while preserving input isolation and atomic verification. OTA has its own commit journal and immutable recovery code; see [OTA](ota.md).

@@ -22,7 +22,8 @@ Host tests do not demonstrate leak prevention or radio stability. Commission the
 | Heap margin | Track Python free/allocated and IDF free/largest block at boot, load, import, history and OTA; investigate sustained decline or low largest blocks |
 | Listener stall | Record serial loop activity, ping, TCP80, accept/error counters, heaps and router state during any failure; do not declare it solved solely because pings work |
 | Slow/malformed clients | Large bodies rejected, trickling upload ends by120s, valves still close; observe maximum loop duration |
-| OTA success/failure | Trusted mirror update, SHA mismatch, out-of-space, network interruption, power cut during commit and repeated failed boots all preserve settings and close outputs |
+| OTA success/failure | Direct GitHub TLS update and optional mirror update, invalid/expired certificates, SHA mismatch, incompatible platform, out-of-space, network interruption, power cut during commit and repeated failed boots all preserve settings and close outputs |
+| Automatic update policy | Catch-up after boot/reconnection, daily idle-time check/install, failed-check retry, failed-boot exclusion and retained-version hold behave as configured without reopening outputs |
 | Configuration durability | Save/rename/import/reboot; calibration, schedule targets, credentials and cooldowns retained |
 | Long history/logs |7-day retention and bounded event files; full history requests leave controls responsive |
 

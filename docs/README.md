@@ -18,7 +18,7 @@ guides and the selected release's compatibility notes before installation.
 | Choose pins, wire valves and connect moisture/environment sensors | [Hardware and board configuration](hardware.md) |
 | Resolve setup, connection, settings, sensor or restart problems | [Troubleshooting](troubleshooting.md) |
 | Verify the actual valves, wiring and network before unattended use | [Commissioning checklist](commissioning.md) |
-| Install an application update or select a previous compatible release | [Updates, retention and recovery](ota.md) |
+| Set up standalone GitHub updates or select a previous compatible release | [Updates, retention and recovery](ota.md) |
 | Check version changes and upgrade compatibility | [Release notes](releases.md) |
 | Understand which original functions are implemented | [Feature parity](feature-parity.md) |
 | Understand timing, persistence, networking and recovery design | [Architecture and reliability](architecture.md) |
@@ -32,7 +32,7 @@ guides and the selected release's compatibility notes before installation.
 | [Native firmware](../firmware/README.md) | Supported board, flash layout, supplied images and ROM cache behavior |
 | [Native firmware manifest](../firmware/manifest.json) | Exact revisions, artifact sizes and hashes |
 | [Native build instructions](../tools/firmware/README.md) | Toolchain setup and reproducible platform build |
-| [Application configuration example](../src/config.example.py) | First-boot defaults, local watchdog/cutoff settings and update mirror configuration |
+| [Application configuration example](../src/config.example.py) | First-boot defaults, local watchdog/cutoff settings and GitHub or optional mirror configuration |
 | [Automated tests](../tests) | Controller, persistence, networking, update and dashboard regressions |
 | [Third-party firmware licenses](../firmware/licenses/README.md) | Notices for the runtime and bundled components |
 

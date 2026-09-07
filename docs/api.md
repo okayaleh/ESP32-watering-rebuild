@@ -25,7 +25,7 @@ The public API retains the original routes below. JSON is UTF-8 and responses cl
 | `/api/config/export` | GET downloadable runtime settings, no credentials |
 | `/api/config/import` | POST validated full configuration; save then reboot |
 | `/api/wifi` | GET SSID/state without password; POST `{ssid,password}` or setup form; save/readback/reboot |
-| `/api/update/check` | POST queue update check; observe `/api/status.update` |
+| `/api/update/check` | POST `{}` checks newest release; optional `{version:"2.0.0-rebuild.4"}` checks a retained GitHub channel version; observe `/api/status.update` |
 | `/api/update/apply` | POST install checked or staged files while idle |
 | `/api/upload` | POST multipart code upload into staging; apply separately |
 | `/api/reboot` | POST close outputs, cancel batch and reboot after response window |
@@ -35,3 +35,21 @@ Schedule: `{id,hour,minute,duration_sec,enabled,valve_names:[],zone_names:[]}`. 
 Names allow48 UTF-8 bytes. Maximum8 valves,16 zones,4 ADC boards and20 schedules; requests remain limited to16KiB, so a very large import/list must fit that byte limit. GPIO assignments must satisfy the selected board profile and cannot collide. Wet target must exceed dry threshold. Durations cannot exceed the local hard cutoff.
 
 Compared with the old server, update checks are queued rather than blocking a request, code uploads require explicit apply, history timestamps are consistently Unix seconds, pin-map/status diagnostics are richer, and startup grace also blocks manual opens. API access is unauthenticated like the original; keep the controller on a trusted LAN.
+
+## Update status and version selection
+
+`/api/status.update` includes `source` (`github` or `mirror`), `repository`,
+`installed_version`, `available_version`, `available`, `state`, `busy`,
+`error`, `files`, `last_check` and `last_install`. GitHub checks also report
+`available_versions` (at most three channel versions) and `release_commit`.
+`auto_install` and `check_hour` describe the configured automatic mode;
+`automatic_paused` and `held_version` report a deliberate rollback hold.
+`blocked_version` identifies a release rejected after a failed boot trial.
+
+A version selection must exist in the freshly downloaded channel and match
+the installed native platform requirements. Arbitrary URLs and Git refs are
+not accepted by this API. A manual check never automatically installs, even
+when daily automatic installation is enabled. Use `/api/update/apply` after
+observing a successful check with `available:true`; uploads require the same
+explicit apply step. Checks and installation require idle watering, and the
+supervisor pauses new runs during maintenance.

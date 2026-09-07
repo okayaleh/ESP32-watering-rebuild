@@ -161,7 +161,7 @@ multi-day network soak.
 | --- | --- |
 | Dashboard settings / `settings.json` | Saved zones, valves, schedules, calibration and watering preferences. These become authoritative after first boot. |
 | `settings.json.prev` | Previous saved settings generation used when recovery can read it. Keep it during investigation. |
-| `config.py` | First-boot defaults and local platform/safety options, including board profile, hard cutoff, watchdog and update mirror URL. Editing first-boot zone defaults does not overwrite existing saved zones. |
+| `config.py` | First-boot defaults and local platform/safety options, including board profile, hard cutoff, watchdog and GitHub/update mirror options. Editing first-boot zone defaults does not overwrite existing saved zones. |
 | `wifi.json` | Saved home-network credentials. A saved nonempty SSID takes precedence over credentials in `config.py`. |
 | **Download backup** | Exports the garden configuration. Wi-Fi credentials are excluded. |
 | **Restore backup & restart** | Validates and replaces the garden configuration, then restarts. It does not restore a Wi-Fi password from that export. |
@@ -193,6 +193,34 @@ stop all local watering logic.
 
 Do not bypass a safety refusal by driving GPIOs directly. Follow the
 [commissioning checklist](commissioning.md) to verify real flow and closure.
+
+## Firmware updates
+
+**“Updates require a plain HTTP mirror”** comes from .2/.3 firmware. Those
+versions cannot fetch GitHub directly. Install .4 once using USB or the
+existing LAN mirror and follow its [configuration step](ota.md#one-time-upgrade-from-2-or-3).
+Changing from USB power to a separate supply does not upgrade firmware.
+
+On .4 or later, **Firmware updates** should show **Direct from GitHub**. A
+local-network source means `UPDATE_BASE_URL` is still set; clear it in the
+board's `config.py`, save and restart to select GitHub. Confirm that the
+repository option names `okayaleh/ESP32-watering-rebuild`.
+
+| Message or observation | What to check |
+| --- | --- |
+| Waiting for home Wi-Fi | The setup hotspot gives local access, not internet. Complete home-network provisioning and confirm the station has connected. |
+| Waiting for the clock | HTTPS needs a correct date. Allow NTP synchronization; check internet access and any router rules blocking NTP. Do not disable TLS verification. |
+| Certificate or TLS failure | Preserve the error and installed version. Check device time, internet filtering and available memory. A changed GitHub certificate chain may require a reviewed trust-bundle update. |
+| Timeout or download failure | Check Wi-Fi signal and internet availability. Automatic checks retry; manual checks may be retried once connectivity returns. Keep normal power on. |
+| No retained-release selector | Run a successful check first. It appears only when another compatible channel release exists; the initial .4 channel has one entry. |
+| Automatic updates paused | A previous channel release was deliberately installed. Check and install the latest release to resume. |
+| Excluded after a failed boot | The board recovered from an unsuccessful release. That version is not retried; use a newly published corrected release. |
+| Plain HTTP mirror unavailable | This optional mode needs the serving computer running and reachable through its LAN firewall. Clear the mirror URL to use direct GitHub mode. |
+
+A manual check never installs automatically. Review the selected version and
+choose **Install update**. Download/install work waits for idle watering,
+and new runs pause while maintenance is active. Automatic-update options
+are separate from the daily and moisture watering enable switches.
 
 ## USB diagnostics and safe restart
 
@@ -249,8 +277,8 @@ USB files and procedure in the [firmware guide](../firmware/README.md) and
 [update recovery guide](ota.md). Back up the device before reflashing a
 partition layout.
 
-To deliberately choose an older release, use the documented release list and
-explicit tag in [Updates, retention and recovery](ota.md). Repository history
+To deliberately choose an older release, use the dashboard retained-release
+selector or an explicit archived tag as documented in [Updates, retention and recovery](ota.md). Repository history
 and the board's one automatic recovery generation are separate. An older
 application must remain compatible with saved settings and the installed
 native/boot files.

@@ -266,19 +266,38 @@ class Application:
         self.reboot()
         return {"ok": True, "reboot": True}
 
-    def update_action(self, action):
+    def update_action(self, action, version=None, automatic=False):
         if not self.updater:
             raise RuntimeError("Updater unavailable")
+        if action not in ("check", "apply"):
+            raise ValueError("Unknown update action")
         if not self.controller.idle():
             raise RuntimeError("Wait for watering to finish before updating")
+        if self.sensors and self.sensors.calibration:
+            raise RuntimeError("Finish calibration before updating")
+        source = getattr(self.updater, "source", None)
+        network = action == "check" or not getattr(self.updater, "uploads", {})
+        if source and network:
+            if not self.wifi or not self.wifi.connected:
+                raise RuntimeError("Connect to your home WiFi before checking or downloading updates")
+            if source == "github" and not (self.ntp and self.ntp.synced and epoch() >= 1704067200):
+                raise RuntimeError("Waiting for internet time synchronization before verified GitHub updates")
+        if automatic and action == "apply" and not self.updater.auto_eligible:
+            raise RuntimeError("Only a successful automatic check can install unattended")
+        was_paused = self.controller.paused
         self.controller.paused = True
         try:
+            if not self.controller.stop_all("firmware update"):
+                raise RuntimeError("Output closure failed before update")
             if action == "check":
-                self.updater.request_check()
+                if version is not None or automatic:
+                    self.updater.request_check(automatic=automatic, version=version)
+                else:
+                    self.updater.request_check()
             else:
                 self.updater.request_install()
         except Exception:
-            self.controller.paused = False
+            self.controller.paused = was_paused
             raise
         return {"ok": True, "queued": True}
 

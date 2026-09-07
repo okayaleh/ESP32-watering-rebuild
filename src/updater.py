@@ -1,8 +1,5 @@
-"""Bounded plain-HTTP staging with an immutable boot recovery journal.
-
-Hashes detect damaged transfers, not a hostile mirror. Use a trusted LAN
-mirror; authentication of release manifests is a separate deployment concern.
-"""
+"""Bounded GitHub HTTPS / optional LAN HTTP staging and boot recovery."""
+import gc
 import os
 import sys
 import socket
@@ -78,30 +75,59 @@ def _ipv4(value):
 
 
 def _url(url):
-    if not isinstance(url, str) or not url.startswith("http://"):
-        raise ValueError("Updates require a plain HTTP mirror")
-    tail = url[7:]
+    if not isinstance(url, str) or not url.startswith(("http://", "https://")):
+        raise ValueError("Configure GitHub updates or a trusted HTTP mirror")
+    secure = url.startswith("https://")
+    tail = url[8:] if secure else url[7:]
     authority, _, path = tail.partition("/")
     host, sep, port = authority.partition(":")
-    if not host or "@" in authority or len(host) > 253:
+    if not host or "@" in authority or len(host) > 253 or any(
+            ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.-" for ch in host):
         raise ValueError("Invalid mirror host")
-    if any(ch in url for ch in ("\r", "\n", " ", "\t", "#")):
+    if any(ord(ch) < 33 or ord(ch) > 126 or ch in "#\\" for ch in url):
         raise ValueError("Invalid mirror URL")
-    port = int(port) if sep and port.isdigit() else 80 if not sep else 0
+    port = int(port) if sep and port.isdigit() else (443 if secure else 80) if not sep else 0
     if not 1 <= port <= 65535:
         raise ValueError("Invalid mirror port")
+    if secure and (host != "raw.githubusercontent.com" or port != 443):
+        raise ValueError("HTTPS updates must use raw.githubusercontent.com:443")
     return host, port, "/" + path
+
+
+def _tls_context():
+    # MicroPython 1.28's native `tls` accepts positional certificate data.
+    # Its frozen `ssl` wrapper instead treats that argument as a filename.
+    # CPython's equivalent is cadata. All paths require trusted certificates.
+    if sys.implementation.name == "micropython":
+        import tls as ssl
+    else:
+        import ssl
+    from github_trust import CA_PEM
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    context.verify_mode = ssl.CERT_REQUIRED
+    if sys.implementation.name == "micropython":
+        context.load_verify_locations(CA_PEM)
+    else:
+        context.check_hostname = True
+        context.load_verify_locations(cadata=CA_PEM.decode("ascii"))
+    return context
 
 
 class HTTPDownload:
     """One socket operation per poll, 512-byte writes, absolute deadline.
 
-    DNS uses an asynchronous resolver callback. Content-Length is mandatory;
-    redirects, transfer-encoding and HTTPS are deliberately rejected.
+    DNS and TLS handshake use nonblocking sockets. Content-Length is mandatory;
+    redirects, compression and transfer-encoding are rejected. HTTPS trusts only
+    the bundled CAs and exact GitHub raw hostname, with no insecure fallback.
     """
     def __init__(self, url, destination, limit, now_ms, resolver=None,
-                 timeout_ms=120000, socket_module=None, poll_factory=None):
+                 timeout_ms=120000, socket_module=None, poll_factory=None,
+                 tls_factory=None):
         self.host, self.port, self.path = _url(url)
+        self.secure = url.startswith("https://")
+        self.tls_factory = tls_factory or _tls_context
+        self.context = None
+        self.raw_sock = None
         self.destination = destination
         self.limit = limit
         self.start = now_ms
@@ -113,7 +139,7 @@ class HTTPDownload:
         self.poller = None
         self.file = None
         self.phase = "resolve"
-        self.request = ("GET %s HTTP/1.0\r\nHost: %s:%s\r\nConnection: close\r\nAccept-Encoding: identity\r\n\r\n" %
+        self.request = ("GET %s HTTP/1.0\r\nHost: %s:%s\r\nConnection: close\r\nAccept-Encoding: identity\r\nUser-Agent: Planter-OTA/1\r\n\r\n" %
                         (self.path, self.host, self.port)).encode()
         if len(self.request) > 2048:
             raise ValueError("Mirror path too long")
@@ -124,17 +150,23 @@ class HTTPDownload:
         self.hash = hashlib.sha256()
         self.done = False
         self.error = None
+        self.header_limit = 4096 if self.secure else 2048
 
     def close(self):
-        if self.sock:
-            try:
-                self.sock.close()
-            except OSError:
-                pass
-            self.sock = None
+        # mbedTLS invalidates its reference after handshake failure, so retain
+        # and close the underlying socket independently on every exit path.
+        for sock in (self.sock, self.raw_sock):
+            if sock:
+                try:
+                    sock.close()
+                except OSError:
+                    pass
+        self.sock = self.raw_sock = self.poller = self.context = None
         if self.file:
             self.file.close()
             self.file = None
+        if self.secure:
+            gc.collect()
 
     def abort(self):
         self.close()
@@ -169,6 +201,7 @@ class HTTPDownload:
                 if not _ipv4(ip):
                     raise ValueError("Resolver did not return IPv4")
                 self.sock = self.socket_module.socket()
+                self.raw_sock = self.sock
                 self.sock.setblocking(False)
                 self.poller = self.poll_factory()
                 self.poller.register(self.sock, POLLOUT | POLLERR | POLLHUP)
@@ -177,34 +210,55 @@ class HTTPDownload:
                 except OSError as exc:
                     if exc.args[0] not in (11, 35, 114, 115, 119, 120, 10035, 10036, 10037):
                         raise
-                self.phase = "send"
+                self.phase = "connect" if self.secure else "send"
                 return
             if not self.poller.poll(0):
                 return
+            if self.phase == "connect":
+                gc.collect()
+                self.context = self.tls_factory()
+                self.sock = self.context.wrap_socket(self.raw_sock,
+                    server_hostname=self.host, do_handshake_on_connect=False)
+                # Poll the wrapper: MicroPython maps TLS WANT_READ/WANT_WRITE
+                # internally, including decrypted bytes already in its buffer.
+                self.poller = self.poll_factory()
+                self.poller.register(self.sock, POLLOUT | POLLERR | POLLHUP)
+                self.phase = "send"
+                return
             if self.phase == "send":
-                count = self.sock.send(self.request[self.offset:self.offset + CHUNK])
+                data = self.request[self.offset:self.offset + CHUNK]
+                count = self.sock.write(data) if self.secure else self.sock.send(data)
+                if count is None:
+                    return
                 if not count:
                     raise OSError("Mirror closed during request")
                 self.offset += count
+                self.poller.modify(self.sock, POLLOUT | POLLERR | POLLHUP)
                 if self.offset == len(self.request):
                     self.poller.modify(self.sock, POLLIN | POLLERR | POLLHUP)
                     self.phase = "header"
                 return
-            data = self.sock.recv(CHUNK)
+            data = self.sock.read(CHUNK) if self.secure else self.sock.recv(CHUNK)
+            if data is None:
+                return
             if not data:
                 raise OSError("Truncated update transfer")
+            self.poller.modify(self.sock, POLLIN | POLLERR | POLLHUP)
             if self.phase == "header":
                 self.header.extend(data)
                 position = self.header.find(b"\r\n\r\n")
                 if position < 0:
-                    if len(self.header) > 2048:
+                    if len(self.header) > self.header_limit:
                         raise ValueError("Mirror response headers too large")
                     return
-                if position > 2048:
+                if position > self.header_limit:
                     raise ValueError("Mirror response headers too large")
                 lines = bytes(self.header[:position]).split(b"\r\n")
-                if len(lines[0].split()) < 2 or lines[0].split()[1] != b"200":
-                    raise ValueError("Mirror must return HTTP 200 without redirects")
+                status = lines[0].split()
+                if len(status) < 2 or status[0] not in (b"HTTP/1.0", b"HTTP/1.1"):
+                    raise ValueError("Invalid update HTTP response")
+                if status[1] != b"200":
+                    raise ValueError("Update server returned HTTP " + status[1].decode()[:8] + "; expected 200 without redirects")
                 lengths = []
                 for line in lines[1:]:
                     key, sep, value = line.partition(b":")
@@ -212,6 +266,8 @@ class HTTPDownload:
                         raise ValueError("Malformed mirror header")
                     if key.lower() == b"transfer-encoding":
                         raise ValueError("Mirror must send Content-Length, not chunked data")
+                    if key.lower() == b"content-encoding" and value.strip().lower() != b"identity":
+                        raise ValueError("Compressed HTTP responses are not allowed")
                     if key.lower() == b"content-length":
                         value = value.strip()
                         if not value.isdigit() or len(value) > 9:
@@ -228,6 +284,12 @@ class HTTPDownload:
             else:
                 self._body(data)
         except OSError as exc:
+            # CPython exposes TLS retry directions as exceptions. MicroPython
+            # uses None/EAGAIN and its SSL poll implementation handles direction.
+            kind = type(exc).__name__
+            if self.secure and kind in ("SSLWantReadError", "SSLWantWriteError"):
+                self.poller.modify(self.sock, (POLLIN if kind == "SSLWantReadError" else POLLOUT) | POLLERR | POLLHUP)
+                return
             if exc.args and exc.args[0] in (11, 35, 10035):
                 return
             self.error = str(exc)
@@ -277,14 +339,35 @@ class UploadSink:
         self.updater.status["busy"] = False
 
 
+def _repository(value):
+    if (not isinstance(value, str) or len(value) > 140 or len(value.split("/")) != 2 or
+            any(not part or part.startswith(".") or part.endswith(".") for part in value.split("/")) or
+            any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_./-" for ch in value) or
+            ".." in value):
+        raise ValueError("Invalid GitHub repository; use owner/repository")
+    return value
+
+
+def _digest(value, size):
+    return isinstance(value, str) and len(value) == size and all(c in "0123456789abcdef" for c in value)
+
+
 class Updater:
     def __init__(self, root=".", base_url="", manifest_path="build/manifest.json",
-                 close_valves=None, idle=None, resolver=None, timeout_ms=120000):
+                 close_valves=None, idle=None, resolver=None, timeout_ms=120000,
+                 github_repo="okayaleh/ESP32-watering-rebuild"):
         self.root = root
         self.stage = _path(root, ".ota")
         if not exists(self.stage):
             os.mkdir(self.stage)
         self.base_url = base_url.rstrip("/")
+        self.source = "mirror" if self.base_url else "github"
+        self.github_repo = _repository(github_repo) if self.source == "github" else None
+        self.download_base = self.base_url
+        self.release = None
+        self.selected_version = None
+        self.automatic_check = False
+        self.auto_eligible = False
         self.manifest_path = manifest_path.lstrip("/")
         self.close_valves = close_valves
         self.idle = idle
@@ -293,10 +376,26 @@ class Updater:
         version_info = read_json(_path(root, "version.json"), {})
         installed_version = version_info.get("version", "unknown") if isinstance(version_info, dict) else str(version_info)
         previous = read_json(_path(root, JOURNAL), {})
+        self.policy = read_json(_path(root, ".ota-policy.json"), {})
+        if not isinstance(self.policy, dict):
+            raise ValueError("Invalid update recovery policy")
+        rejected = self.policy.get("rejected", [])
+        if not isinstance(rejected, list) or any(not isinstance(v, str) for v in rejected):
+            raise ValueError("Invalid rejected update list")
+        if isinstance(previous, dict) and previous.get("phase") == "rolled_back":
+            failed = previous.get("version")
+            if isinstance(failed, str) and failed not in rejected:
+                self.policy["rejected"] = (rejected + [failed])[-8:]
+                atomic_json(_path(root, ".ota-policy.json"), self.policy)
         self.status = {"busy": False, "state": "idle", "available": False,
                        "version": None, "error": None, "files": [],
                        "installed_version": installed_version,
                        "available_version": None, "last_check": None,
+                       "source": self.source, "repository": self.github_repo,
+                       "available_versions": [], "release_commit": None,
+                       "blocked_version": None,
+                       "automatic_paused": bool(self.policy.get("held_version")),
+                       "held_version": self.policy.get("held_version"),
                        "last_install": previous.get("installed_at") if isinstance(previous, dict) else None}
         self.reboot_required = False
         self.phase = "idle"
@@ -321,15 +420,27 @@ class Updater:
         if journal and journal.get("phase") not in ("stable", "rolled_back"):
             raise ValueError("Previous firmware must pass its boot trial first")
 
-    def request_check(self):
+    def request_check(self, automatic=False, version=None):
         self._require_idle()
-        _url(self.base_url)
+        if version is not None and (not isinstance(version, str) or not 0 < len(version) <= 64):
+            raise ValueError("Invalid release version")
+        if self.source == "mirror":
+            _url(self.base_url)
+            if version is not None:
+                raise ValueError("Choose the release on your HTTP mirror")
+        self.release = None
+        self.selected_version = version
+        self.automatic_check = automatic
+        self.auto_eligible = False
         self.uploads = {}
         self.changed = []
+        self.deletions = []
+        self.entries = []
         self.status.update({"busy": True, "state": "checking", "error": None,
-                            "available": False, "files": []})
+                            "available": False, "files": [], "available_version": None,
+                            "release_commit": None, "blocked_version": None})
         self.cleanup_names = list(os.listdir(self.stage))
-        self.after_cleanup = "manifest_start"
+        self.after_cleanup = "channel_start" if self.source == "github" else "manifest_start"
         self.phase = "cleanup"
 
     def begin_upload(self, filename):
@@ -337,6 +448,12 @@ class Updater:
         if len(self.uploads) >= MAX_FILES and filename not in self.uploads:
             raise ValueError("Too many uploaded files")
         validate_filename(filename)
+        self.auto_eligible = False
+        self.release = None
+        if not self.uploads:
+            self.status["available"] = False
+            self.changed = []
+            self.deletions = []
         self.status["busy"] = True
         self.status["state"] = "uploading"
         return UploadSink(self, filename)
@@ -347,6 +464,7 @@ class Updater:
             raise ValueError("No checked update or uploaded files")
         if not self.close_valves or not self.idle:
             raise ValueError("Valve safety callbacks are required for installation")
+        self.auto_eligible = False
         if self.uploads:
             self.changed = list(self.uploads.values())
             self.deletions = []
@@ -364,14 +482,56 @@ class Updater:
             raise ValueError("Manifest paths must be relative to the mirror")
         if ".." in repo_path.split("/") or any(ch in repo_path for ch in ("\\", "?", "#", ":")):
             raise ValueError("Unsafe manifest repository path")
-        self.transfer = HTTPDownload(self.base_url + "/" + repo_path, dest,
+        self.transfer = HTTPDownload(self.download_base + "/" + repo_path, dest,
             limit, now_ms, self.resolver, self.timeout_ms)
+
+    def _parse_channel(self):
+        with open(_path(self.stage, "channel"), "r") as stream:
+            channel = json.load(stream)
+        if (not isinstance(channel, dict) or type(channel.get("schema")) is not int or
+                channel["schema"] != 1 or channel.get("repository") != self.github_repo):
+            raise ValueError("Invalid GitHub update channel")
+        releases = channel.get("releases")
+        if not isinstance(releases, list) or not 0 < len(releases) <= 3:
+            raise ValueError("GitHub channel requires one to three releases")
+        versions = []
+        for release in releases:
+            if not isinstance(release, dict):
+                raise ValueError("Invalid channel release")
+            version = release.get("version")
+            if (not isinstance(version, str) or not 0 < len(version) <= 64 or
+                    any(c not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-" for c in version) or
+                    version in versions):
+                raise ValueError("Invalid or duplicate channel version")
+            if not _digest(release.get("commit"), 40) or not _digest(release.get("manifest_sha256"), 64):
+                raise ValueError("Channel must pin an immutable commit and manifest SHA-256")
+            size = release.get("manifest_size")
+            if type(size) is not int or not 0 < size <= MAX_MANIFEST:
+                raise ValueError("Invalid channel manifest size")
+            versions.append(version)
+        self.status["available_versions"] = versions
+        selected = self.selected_version or versions[0]
+        if selected not in versions:
+            raise ValueError("Selected version is no longer in the retained GitHub channel")
+        if selected in self.policy.get("rejected", []):
+            self.status["blocked_version"] = selected
+            raise ValueError("This release failed its boot trial; wait for a newer release")
+        self.release = dict(releases[versions.index(selected)])
+        self.release["rollback"] = selected != versions[0]
+        self.download_base = "https://raw.githubusercontent.com/" + self.github_repo + "/" + self.release["commit"]
+        self.status["release_commit"] = self.release["commit"]
 
     def _parse_manifest(self):
         with open(_path(self.stage, "manifest"), "r") as stream:
             manifest = json.load(stream)
         if not isinstance(manifest, dict):
             raise ValueError("Manifest must be an object")
+        if self.release:
+            if (manifest.get("platform") != "planter-esp32-romfs-mpy6" or
+                    manifest.get("native_sha256") != "9369e9e2eba45a9828d3d8c929c2b39ddeb41987318d8aa092aa130908780073"):
+                raise ValueError("This release requires a different native firmware; install it by USB")
+            if manifest.get("version") != self.release["version"]:
+                raise ValueError("Manifest version does not match the GitHub channel")
         files = manifest.get("files", [])
         if isinstance(files, dict):
             files = [dict(value, name=name) for name, value in files.items()]
@@ -394,6 +554,9 @@ class Updater:
             path = entry.get("path")
             if not isinstance(path, str) or not path or len(path) > 256:
                 raise ValueError("Every file requires a repository path")
+            if (path.startswith("/") or ".." in path.split("/") or
+                    any(ch in path for ch in ("\\", "?", "#", ":", "\r", "\n", " ", "\t"))):
+                raise ValueError("Unsafe manifest repository path")
             total += size
         if total > 2 * 1024 * 1024:
             raise ValueError("Update is too large")
@@ -412,7 +575,7 @@ class Updater:
                     validate_filename(sibling)
                     deletes.append(sibling)
         self.entries = files
-        self.deletions = list(set(deletes))
+        self.deletions = [name for name in set(deletes) if exists(_path(self.root, name))]
         self.status["version"] = str(manifest.get("version", "unknown"))[:64]
         self.status["available_version"] = self.status["version"]
         self.index = 0
@@ -438,6 +601,11 @@ class Updater:
             raise ValueError("Too many transaction entries")
         self.journal = {"phase": "committing", "boots": 0, "entries": entries,
                         "version": self.status["available_version"]}
+        if self.release:
+            held = self.release["version"] if self.release["rollback"] else None
+            if self.policy.get("held_version") != held:
+                self.policy["held_version"] = held
+                atomic_json(_path(self.root, ".ota-policy.json"), self.policy)
         self.index = 0
         self.phase = "backup"
         self.status["state"] = "preparing"
@@ -449,6 +617,16 @@ class Updater:
                 stream.close()
                 setattr(self, name, None)
 
+    def _release_transfer(self):
+        if self.transfer is None:
+            return
+        self.transfer.close()
+        self.transfer = None
+        # TLS buffers are much larger than the application's regular slices.
+        # Release them before JSON parsing or opening the next TLS connection.
+        import gc
+        gc.collect()
+
     def poll(self, now_ms):
         try:
             self._poll(now_ms)
@@ -456,8 +634,10 @@ class Updater:
             self._close_files()
             if self.transfer:
                 self.transfer.abort()
-                self.transfer = None
-            self.status.update({"busy": False, "state": "error", "error": str(exc)})
+            self._release_transfer()
+            self.auto_eligible = False
+            self.status.update({"busy": False, "state": "error", "error": str(exc),
+                                "available": False})
             journal = read_json(_path(self.root, JOURNAL))
             if journal and journal.get("phase") in ("committing", "pending", "rolling_back"):
                 # Recovery belongs to immutable boot code; never continue
@@ -471,22 +651,37 @@ class Updater:
         if self.phase == "cleanup":
             if self.cleanup_names:
                 name = self.cleanup_names.pop()
-                if name == "manifest" or name.startswith(("new-", "old-")):
+                if name in ("manifest", "channel") or name.startswith(("new-", "old-")):
                     _remove(_path(self.stage, name))
             else:
                 self.phase = self.after_cleanup
             return
+        if self.phase == "channel_start":
+            self.download_base = "https://raw.githubusercontent.com/" + self.github_repo
+            self._download("updates/channel.json", _path(self.stage, "channel"), 4096, now_ms)
+            self.phase = "channel"
+            return
         if self.phase == "manifest_start":
-            self._download(self.manifest_path, _path(self.stage, "manifest"), MAX_MANIFEST, now_ms)
+            path = "build/manifest.json" if self.release else self.manifest_path
+            limit = self.release["manifest_size"] if self.release else MAX_MANIFEST
+            self._download(path, _path(self.stage, "manifest"), limit, now_ms)
             self.phase = "manifest"
             return
-        if self.phase in ("manifest", "download"):
+        if self.phase in ("channel", "manifest", "download"):
             self.transfer.poll(now_ms)
             if self.transfer.error:
                 raise OSError(self.transfer.error)
             if not self.transfer.done:
                 return
-            if self.phase == "manifest":
+            if self.phase == "channel":
+                self._release_transfer()
+                self._parse_channel()
+                self.phase = "manifest_start"
+            elif self.phase == "manifest":
+                if self.release and (self.transfer.size != self.release["manifest_size"] or
+                        _hex(self.transfer.hash) != self.release["manifest_sha256"]):
+                    raise ValueError("Manifest failed its channel SHA-256 or size check")
+                self._release_transfer()
                 self._parse_manifest()
                 self.phase = "hash"
             else:
@@ -496,7 +691,7 @@ class Updater:
                     raise ValueError("Downloaded file failed SHA-256 or size check")
                 self.index += 1
                 self.phase = "download_start"
-            self.transfer = None
+            self._release_transfer()
             return
         if self.phase == "hash":
             if self.index >= len(self.entries):
@@ -504,6 +699,7 @@ class Updater:
                     "available": bool(self.changed or self.deletions),
                     "last_check": epoch(),
                     "files": [item["name"] for item in self.changed] + self.deletions})
+                self.auto_eligible = self.automatic_check and self.status["available"]
                 self.phase = "idle"
                 return
             entry = self.entries[self.index]
@@ -605,12 +801,96 @@ class Updater:
             self.phase = "idle"
 
 
+class UpdateSchedule:
+    """Daily checks with startup catch-up and bounded retries, while idle only."""
+    def __init__(self):
+        self.completed_slot = None
+        self.pending = None
+        self.pending_slot = None
+        self.last_attempt = None
+        self.failures = 0
+        self.apply_pending = False
+
+    def _failed(self, now_ms):
+        self.failures += 1
+        self.last_attempt = now_ms
+        self.completed_slot = None
+        self.apply_pending = False
+
+    def poll(self, app, now_ms):
+        updater = app.updater
+        if not updater:
+            return
+        status = updater.status
+        if self.pending:
+            if status["busy"]:
+                return
+            if status["state"] in ("checked", "reboot_required") and not status.get("error"):
+                self.completed_slot = self.pending_slot
+                self.failures = 0
+                self.apply_pending = (self.pending == "check" and updater.auto_eligible and
+                                      getattr(app.config, "UPDATE_AUTO_INSTALL", False))
+            else:
+                self._failed(now_ms)
+            self.pending = None
+        hour = getattr(app.config, "UPDATE_CHECK_HOUR", 4)
+        if (type(hour) is not int or not 0 <= hour <= 23 or app.uptime_ms < 60000 or
+                not app.controller.synced or not app.wifi or not app.wifi.connected or
+                not app.controller.idle() or app.controller.paused or
+                app.controller.inhibited or app.reboot_at is not None or
+                status["busy"] or updater.reboot_required or status.get("automatic_paused") or
+                (app.sensors and app.sensors.calibration) or
+                (app.server and app.server.health().get("active_uploads", 0))):
+            return
+        # A user's staged upload or manually checked release needs their Apply
+        # action. Never replace it with an automatic check or install it later.
+        if updater.uploads or (status["available"] and not updater.auto_eligible):
+            return
+        local = epoch() + app.settings["tz_offset_min"] * 60
+        slot = (local - hour * 3600) // 86400
+        if self.apply_pending:
+            self.apply_pending = False
+            try:
+                app.update_action("apply", automatic=True)
+                self.pending = "apply"
+                self.pending_slot = slot
+            except Exception:
+                self._failed(now_ms)
+                raise
+            return
+        if self.completed_slot == slot:
+            return
+        retry_ms = 300000 if self.failures <= 1 else 1800000
+        if self.failures and self.last_attempt is not None and ticks_diff(now_ms, self.last_attempt) < retry_ms:
+            return
+        self.last_attempt = now_ms
+        try:
+            app.update_action("check", automatic=True)
+            self.pending = "check"
+            self.pending_slot = slot
+        except Exception:
+            self._failed(now_ms)
+            raise
+
+
 def mark_stable(root="."):
     """Call only after 60 seconds of successful safety-loop iterations."""
     path = _path(root, JOURNAL)
     journal = read_json(path)
-    if not journal or journal.get("phase") == "committing":
+    if journal is None:
+        if exists(path) or exists(path + ".prev"):
+            raise ValueError("Unreadable update recovery journal")
+        # A fresh USB installation has no update transaction to acknowledge.
+        # The caller still requires 60 seconds of healthy safety-loop service.
+        return True
+    if not isinstance(journal, dict):
+        raise ValueError("Invalid update recovery journal")
+    if journal.get("phase") in ("committing", "rolling_back"):
         return False
+    if journal.get("phase") in ("stable", "rolled_back"):
+        return True
+    if journal.get("phase") != "pending":
+        raise ValueError("Unknown update recovery phase")
     journal["phase"] = "stable"
     atomic_json(path, journal)
     # Keep a stable tombstone. It avoids reactivating a stale .prev journal

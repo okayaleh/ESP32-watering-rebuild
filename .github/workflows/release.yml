@@ -25,6 +25,8 @@ jobs:
         run: python tools/build.py --version "${GITHUB_REF_NAME#v}"
       - run: python tools/check.py
       - run: python tools/package.py
+      - name: Verify committed OTA payload matches this release build
+        run: python tools/publish_channel.py --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME" --verify-build-only
       - name: Publish verified package
         env:
           GH_TOKEN: ${{ github.token }}
@@ -38,3 +40,7 @@ jobs:
           gh release create "$GITHUB_REF_NAME" release/*.zip release/*.sha256 --draft \
             --verify-tag --title "$GITHUB_REF_NAME" --generate-notes "${options[@]}"
           gh release edit "$GITHUB_REF_NAME" --draft=false
+      - name: Publish standalone GitHub update channel
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python tools/publish_channel.py --repo "$GITHUB_REPOSITORY" --tag "$GITHUB_REF_NAME" --publish

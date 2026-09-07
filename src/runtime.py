@@ -47,7 +47,7 @@ def run(config):
         state.event("network_error", str(exc))
     from moisture import create_bus, MoistureManager
     from env_sensors import EnvSensors
-    from updater import Updater, mark_stable
+    from updater import Updater, UpdateSchedule, mark_stable
     from web import HTTPServer
     from api import APIRouter
     from status_led import StatusLED
@@ -69,17 +69,21 @@ def run(config):
             manifest_path=getattr(config, "UPDATE_MANIFEST_PATH", "build/manifest.json"),
             close_valves=lambda: controller.stop_all("firmware update"), idle=controller.idle,
             resolver=app.wifi.dns.resolve if app.wifi else None,
-            timeout_ms=max(15000, getattr(config, "UPDATE_TIMEOUT_SEC", 15) * 1000))
+            timeout_ms=max(15000, getattr(config, "UPDATE_TIMEOUT_SEC", 60) * 1000),
+            github_repo=getattr(config, "UPDATE_GITHUB_REPO", "okayaleh/ESP32-watering-rebuild"))
+        app.updater.status["auto_install"] = bool(getattr(config, "UPDATE_AUTO_INSTALL", False))
+        app.updater.status["check_hour"] = getattr(config, "UPDATE_CHECK_HOUR", 4)
     except Exception as exc:
         state.event("update_error", str(exc))
     def upload_factory(filename):
         if not app.updater or not controller.idle():
             raise RuntimeError("Uploads require an idle controller")
+        was_paused = controller.paused
         controller.paused = True
         try:
             return app.updater.begin_upload(filename)
         except Exception:
-            controller.paused = False
+            controller.paused = was_paused
             raise
     app.server = HTTPServer(APIRouter(app), event=state.event,
         upload_factory=upload_factory, redirect=lambda: bool(app.wifi and app.wifi.portal.active),
@@ -94,7 +98,8 @@ def run(config):
     last_tick = ticks_ms()
     busy_ms = total_ms = 0
     stable = False
-    update_day = reboot_day = None
+    reboot_day = None
+    update_schedule = UpdateSchedule()
     errors = {}
     def guarded(label, function):
         success = True
@@ -111,6 +116,9 @@ def run(config):
         if not controller.tick(ticks_ms(), epoch(), bool(app.ntp and app.ntp.synced)):
             machine.reset()
         return success
+    def finish_boot_trial():
+        nonlocal stable
+        stable = mark_stable()
     while True:
         begin = ticks_ms()
         elapsed = max(0, ticks_diff(begin, last_tick))
@@ -156,7 +164,9 @@ def run(config):
             controller.stop_all("reboot")
             machine.reset()
         if not stable and controller.idle() and app.uptime_ms >= 60000 and not controller.inhibited and not (app.updater and app.updater.status["busy"]):
-            stable = guarded("boot_trial", mark_stable)
+            guarded("boot_trial", finish_boot_trial)
+        if stable and controller.idle():
+            guarded("auto_update", lambda: update_schedule.poll(app, ticks_ms()))
         now = ticks_ms()
         if ticks_diff(now, last_metrics) >= 5000:
             app.cpu_percent = min(100, round(100 * busy_ms / max(1, total_ms), 1))
@@ -189,12 +199,6 @@ def run(config):
             last_maintenance = now
             local = epoch() + app.settings["tz_offset_min"] * 60
             hour, day = (local // 3600) % 24, local // 86400
-            if app.updater and app.wifi and app.wifi.connected and hour == getattr(config, "UPDATE_CHECK_HOUR", None) and day != update_day:
-                update_day = day
-                if getattr(config, "UPDATE_BASE_URL", ""):
-                    guarded("auto_update_check", lambda: app.update_action("check"))
-            if app.updater and getattr(config, "UPDATE_AUTO_INSTALL", False) and app.updater.status["available"] and not app.updater.status["busy"]:
-                guarded("auto_update_apply", lambda: app.update_action("apply"))
             if app.uptime_ms >= 3600000 and hour == getattr(config, "DAILY_REBOOT_HOUR", None) and day != reboot_day:
                 reboot_day = day
                 app.reboot()

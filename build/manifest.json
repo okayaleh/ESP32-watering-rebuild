@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-rebuild.3",
+  "version": "2.0.0-rebuild.4",
   "mpy": "6.3",
   "files": [
     {
@@ -11,14 +11,14 @@
     {
       "name": "api.mpy",
       "path": "build/api.mpy",
-      "size": 4513,
-      "sha256": "16d7ee8df3cc486c667c70264048216a9707d34f984cfdd2a7d67b93a8b6c230"
+      "size": 4669,
+      "sha256": "0c914ba6b0294e974dab19c64a6adaca538ba7c1fe7d83a2b021e2b6f22a95f5"
     },
     {
       "name": "application.mpy",
       "path": "build/application.mpy",
-      "size": 6218,
-      "sha256": "740ec054dc6d24054e56e64a953b02460f0daee2d81ad647b57e57e4aabed714"
+      "size": 6856,
+      "sha256": "ec76998a021c0907b66f8939cf8f93c844f3595cfbf75e80a7d8d76a015594cf"
     },
     {
       "name": "compat.mpy",
@@ -37,6 +37,12 @@
       "path": "build/env_sensors.mpy",
       "size": 2136,
       "sha256": "d25adb1ccf5499616af1118f2043945ac97722c32b9b0df76c47ce95c2afac19"
+    },
+    {
+      "name": "github_trust.mpy",
+      "path": "build/github_trust.mpy",
+      "size": 3723,
+      "sha256": "5848584a9fd261d0a6a4bb7764cdee1d3c9185e86c53e802989021427e262a22"
     },
     {
       "name": "main.py",
@@ -59,8 +65,8 @@
     {
       "name": "runtime.mpy",
       "path": "build/runtime.mpy",
-      "size": 4862,
-      "sha256": "e91386bafb5eb18d712162275ab1f0d5834f8b4e078050340f945aea43b6be4d"
+      "size": 4920,
+      "sha256": "e99026233647a21b372543dcb8cf312c873532dc57184628ffe15868ba3422e9"
     },
     {
       "name": "settings_store.mpy",
@@ -83,8 +89,8 @@
     {
       "name": "updater.mpy",
       "path": "build/updater.mpy",
-      "size": 10148,
-      "sha256": "9c18b34b98648733a0bb4055b842a1ae78a3ecba43bf51970457277e94109974"
+      "size": 16171,
+      "sha256": "4938625cd6eacfa3ef0bb18b2d5b4d873e8d22231ca83fa820a2d1607dc30361"
     },
     {
       "name": "valve.mpy",
@@ -113,20 +119,22 @@
     {
       "name": "index.html",
       "path": "build/index.html",
-      "size": 60164,
-      "sha256": "62e66f56d954d6d10125474a6dcf37c4ea5b18be6162c40d4da37de11621cfa2"
+      "size": 64145,
+      "sha256": "b772d0f43e7ba8c7221335bb9fc2fcd61fae8c62492ea54d967aaa27ed18a60b"
     },
     {
       "name": "index.html.gz",
       "path": "build/index.html.gz",
-      "size": 19038,
-      "sha256": "5eab33a5b146907b60917e3b523ce985d22ab375c5f3d815f09503c767490846"
+      "size": 20192,
+      "sha256": "f1070dea6ce7fbe473c51e874574eab826fd23182e3847eb57555b0133a8a921"
     },
     {
       "name": "version.json",
       "path": "build/version.json",
       "size": 31,
-      "sha256": "f4e517af7ac7f272083694827855384ea0352729be36d7d50d643e4e993cde13"
+      "sha256": "932fdeec145337c6b04b4b7d0c588669796b8e45d1addcf3ec345d75622d3b31"
     }
-  ]
+  ],
+  "platform": "planter-esp32-romfs-mpy6",
+  "native_sha256": "9369e9e2eba45a9828d3d8c929c2b39ddeb41987318d8aa092aa130908780073"
 }

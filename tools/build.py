@@ -97,7 +97,11 @@ def build(version, compiler=None):
         generated.append(target)
     dashboard = (source / "index.html").read_bytes()
     (output / "index.html").write_bytes(dashboard)
-    (output / "index.html.gz").write_bytes(gzip.compress(dashboard, compresslevel=9, mtime=0))
+    compressed = bytearray(gzip.compress(dashboard, compresslevel=9, mtime=0))
+    # Python 3.11/3.12 let zlib stamp a platform-specific OS byte with mtime=0.
+    # GitHub's Linux rebuild must match the Windows commit byte for byte.
+    compressed[9] = 255
+    (output / "index.html.gz").write_bytes(compressed)
     generated.extend([output / "index.html", output / "index.html.gz"])
     (output / "version.json").write_text(json.dumps({"version": version}) + "\n", encoding="utf-8", newline="\n")
     generated.append(output / "version.json")
@@ -105,14 +109,16 @@ def build(version, compiler=None):
     files = [{"name": p.name, "path": "build/" + p.name,
               "size": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
              for p in generated if p.name not in ("boot.py", "romboot.py")]
-    manifest = {"version": version, "mpy": "6.3", "files": files}
+    manifest = {"version": version, "mpy": "6.3", "files": files,
+                "platform": "planter-esp32-romfs-mpy6",
+                "native_sha256": "9369e9e2eba45a9828d3d8c929c2b39ddeb41987318d8aa092aa130908780073"}
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     print("Built %s OTA files; dashboard %s -> %s bytes gzip" % (len(files), len(dashboard), (output / "index.html.gz").stat().st_size))
     print("Flash boot.py and romboot.py separately; config.py is local-only. All three are excluded from OTA.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="2.0.0-rebuild.3")
+    parser.add_argument("--version", default="2.0.0-rebuild.4")
     parser.add_argument("--mpy-cross")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", args.version):

@@ -77,6 +77,41 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
     themeEnvironmentLive.systemChange(false);assert.equal(themeRoot.dataset.theme,'dark');
     themeEnvironmentLive.blocked=false;
     assert.equal(requests.length,themeRequests,'Theme changes must not send controller requests');
+    // Update status explains standalone operation, preserves a selected release
+    // through polling, and requires an explicit install after manual checks.
+    const originalStatus=await run('JSON.stringify(model.status)');
+    await run("model.status={wifi_connected:true,time_synced:true,update:{source:'github',repository:'okayaleh/ESP32-watering-rebuild',installed_version:'2.0.0-rebuild.4',available_version:'2.0.0-rebuild.5',available_versions:['2.0.0-rebuild.5','2.0.0-rebuild.4','2.0.0-rebuild.3'],available:true,auto_install:true,check_hour:4,state:'available'}};renderUpdate();");
+    assert.match(ids.get('update-source').textContent,/Direct from GitHub/);
+    assert.match(ids.get('update-automation').textContent,/04:00/);
+    assert.match(ids.get('update-summary').textContent,/2\.0\.0-rebuild\.5.*ready to install/);
+    assert.equal(ids.get('update-releases').hidden,false);
+    assert.deepEqual(ids.get('update-version').children.map(option=>option.value),['2.0.0-rebuild.5','2.0.0-rebuild.3']);
+    ids.get('update-version').value='2.0.0-rebuild.3';await run('renderUpdate()');
+    assert.equal(ids.get('update-version').value,'2.0.0-rebuild.3');
+    await run("model.status.update.busy=true;model.status.update.state='downloading';renderUpdate();");
+    assert.equal(ids.get('update-check').disabled,true);assert.equal(ids.get('update-apply').disabled,true);
+    assert.match(ids.get('update-summary').textContent,/Downloading and verifying/);
+    await run("model.status.update.busy=false;model.status.update.error='<img src=x onerror=alert(1)>';renderUpdate();");
+    assert.match(ids.get('update-summary').textContent,/<img src=x/);assert.equal(ids.get('update-summary').children.length,0);
+    await run("model.status.update.error=null;model.status.update.available=false;model.status.update.state='idle';model.status.wifi_connected=false;renderUpdate();");
+    assert.match(ids.get('update-summary').textContent,/home Wi-Fi with internet/);assert.equal(ids.get('update-apply').disabled,true);
+    await run("model.status.wifi_connected=true;model.status.time_synced=false;renderUpdate();");
+    assert.match(ids.get('update-summary').textContent,/clock to synchronize/);
+    await run("model.status.time_synced=true;model.status.update.state='checked';renderUpdate();");
+    assert.match(ids.get('update-summary').textContent,/matches the selected release/);
+    await run("model.status.update.automatic_paused=true;model.status.update.held_version='2.0.0-rebuild.3';renderUpdate();");
+    assert.match(ids.get('update-automation').textContent,/paused.*2\.0\.0-rebuild\.3/);
+    await run("model.status.update.automatic_paused=false;model.status.update.auto_install=false;renderUpdate();");
+    assert.match(ids.get('update-automation').textContent,/Automatic installation is off/);
+    await run("globalThis.updateAudit=[];globalThis.savedUpdatePost=post;post=async(path,body)=>{updateAudit.push({path,body});return {ok:true};}");
+    try{
+      await fire('update-select');
+      assert.equal(await run('updateAudit[0].path'),'/api/update/check');
+      assert.equal(await run('updateAudit[0].body.version'),'2.0.0-rebuild.3');
+      await fire('update-check');
+      assert.equal(await run('JSON.stringify(updateAudit[1].body)'),'{}');
+      assert.equal(await run('updateAudit.length'),2,'Checks must not trigger an installation');
+    }finally{await run('post=savedUpdatePost');sandbox.restoredUpdateStatus=JSON.parse(originalStatus);await run('model.status=restoredUpdateStatus;renderUpdate()');}
     // The request queue must survive a rejection and serialize simultaneous jobs.
     failNext=true;
     await run("Promise.allSettled([request('/api/status'),request('/api/settings'),request('/api/events')])");
@@ -124,7 +159,7 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
     // Render malicious names as literal text; no HTML parsing is used.
     await run("model.zones.push({name:'<img src=x onerror=alert(1)>',channel:3,valves:[]});renderLive();renderStatus();");
     assert.match(ids.get('zones-live').textContent,/<img src=x/);
-    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['system theme default','stored theme reload','invalid preference fallback','blocked storage fallback','theme toggle accessibility','system theme changes','manual preference overrides system','chart and legend theme redraw','theme changes stay local','startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','safe DOM text']},null,2));
+    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['system theme default','stored theme reload','invalid preference fallback','blocked storage fallback','theme toggle accessibility','system theme changes','manual preference overrides system','chart and legend theme redraw','theme changes stay local','standalone update status','retained release selection survives polling','busy update controls','literal update errors','offline and clock guidance','automatic update hold and opt-out','manual version check without install','startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','safe DOM text']},null,2));
   } catch(error) { console.error('AUDIT FAILURE',error);throw error; } finally {
     sandbox.restoreZones=JSON.parse(savedZones);sandbox.restoreSchedules=JSON.parse(savedSchedules);
     await run("request('/api/zones').then(zones=>post('/api/zones',{zones:restoreZones,renames:zones.some(z=>z.name==='Audit tomatoes')?{'Audit tomatoes':restoreZones[0].name}:{}}))");
