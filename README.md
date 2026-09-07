@@ -6,9 +6,9 @@ A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.
 
 ## Project status
 
-The current application is **2.0.0-rebuild.2**, published as a **prerelease** and installed on a classic ESP32-D0WD-V3 with 4 MB flash. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
+The current application is **2.0.0-rebuild.3**, a **prerelease** adding dashboard dark mode and the GPIO2 RGB status colors. See the [release notes](docs/releases.md) for changes and the one-time RGB configuration step on existing installations. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
-Validation includes **190 host tests**, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. The bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**.
+The previous application, **2.0.0-rebuild.2**, was installed on a classic ESP32-D0WD-V3 with 4 MB flash. Its validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. That bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**. Current release checks and the distinction from earlier hardware measurements are recorded in the [validation report](docs/validation.md).
 
 The installed bench board has both automatic watering modes disabled. **Fresh application defaults enable daily and moisture watering. Keep valve supply power disconnected during setup, then disable or review both modes in Settings before commissioning.** Router outage recovery, DHCP renewal, actual sensors and valves, and a 48–72-hour network soak remain to be validated. Read the [validation report](docs/validation.md) for measured results and limits, and complete the [commissioning checklist](docs/commissioning.md) before unattended watering.
 
@@ -21,7 +21,8 @@ The installed bench board has both automatic watering modes disabled. **Fresh ap
 | Output supervision | Closure at boot, monotonic deadlines, hard maximum run duration, startup grace, hardware watchdog and persistent watering intent |
 | Schedule persistence | Occurrences recorded before activation to prevent duplicate starts after resets or backward clock changes |
 | Sensors | Up to 4 ADS1115 boards on one I2C bus; optional AHT20, BMP280 and digital rain indication; bounded reads and bus recovery |
-| Dashboard | Live status, manual controls, charts, schedules, settings, calibration, GPIO map, environment/weather, Wi-Fi, event log and diagnostics |
+| Dashboard | Light/dark themes with a remembered browser preference; live status, controls, charts, schedules, settings, calibration, GPIO map, weather, Wi-Fi and diagnostics |
+| RGB status LED | GPIO2 addressable RGB: green connected, blue watering, yellow disconnected, white setup/rescue hotspot |
 | Networking | Bounded nonblocking HTTP, DNS, NTP and update transfers; Wi-Fi retry/backoff, setup/rescue hotspot and gateway health checks |
 | Configuration | Validated settings, rename propagation, import/export, separate credentials and migration support for the original project |
 | Updates | Hashed manifests, staged uploads, transactional installation, failed-boot recovery and selectable archived releases |
@@ -40,6 +41,7 @@ The repository's **[Documents section](docs/README.md)** is the entry point for 
 | [Troubleshooting](docs/troubleshooting.md) | Hotspot passwords, Google mesh, connection diagnostics, startup and recovery |
 | [Commissioning](docs/commissioning.md) | Physical checks and network soak required before unattended watering |
 | [Updates and rollback](docs/ota.md) | Publish releases, retain earlier updates, run the laptop mirror and recover |
+| [Release notes](docs/releases.md) | Version changes and upgrade compatibility |
 | [HTTP API](docs/api.md) | Routes, request formats, limits, errors and control behavior |
 | [Architecture](docs/architecture.md) | Control loop, persistence, networking, memory and failure handling |
 | [Feature checklist](docs/feature-parity.md) | Comparison with the original project and remaining groundwork |
@@ -59,7 +61,7 @@ For the intended garden installation, use normally closed 12 V solenoid valves, 
 | I2C SDA / SCL | GPIO21 / GPIO22 |
 | First ADS1115 | Address `0x48` |
 | First moisture probe | ADS1115 A0, global channel 0 |
-| Plain status LED | GPIO2 |
+| Addressable RGB LED data | GPIO2 |
 
 No valve supply or sensors are required to explore the dashboard on a bench board. Sensor errors are expected when those devices are absent.
 
@@ -76,6 +78,12 @@ The hostname is `planter`; automatic `planter.local` resolution depends on firmw
 ## Normal operation and configuration
 
 Use the dashboard to map each soil zone to its ADC channel and valves, calibrate dry/wet readings, then set its dry threshold, wet target and run duration. Configure daily schedules separately. Manual zone or all-valve actions run mapped valves sequentially; **Stop all** cancels pending runs and moisture recheck cycles. Saving settings can stop and cancel queued watering, and hardware/pin changes require a reboot.
+
+Use the **Dark mode** toggle in the dashboard header to change appearance. On
+first visit, the dashboard follows the browser's system color preference; an
+explicit choice is remembered in that browser. Theme changes do not change
+controller settings or interrupt watering. The [hardware guide](docs/hardware.md#rgb-status-led)
+explains the four steady LED colors and their priority.
 
 | Location | Purpose | Updated by application OTA? |
 | --- | --- | --- |
@@ -101,7 +109,7 @@ python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --list
 Download a specific release, verify its archive and application hashes, and serve it from the laptop:
 
 ```powershell
-$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.2
+$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.3
 if ($LASTEXITCODE -ne 0) { throw "Release verification failed" }
 python tools/mirror.py --directory "$releaseRoot" --port 8000
 ```
@@ -118,7 +126,7 @@ Use Python 3.10+ and Node.js 22+. From a new checkout:
 git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
 cd ESP32-watering-rebuild
 python -m pip install -r requirements-dev.txt
-python tools/build.py --version 2.0.0-rebuild.2
+python tools/build.py --version 2.0.0-rebuild.3
 python tools/check.py
 ```
 

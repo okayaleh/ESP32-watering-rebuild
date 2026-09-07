@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const assert = require('node:assert/strict');
 const source = fs.readFileSync('src/index.html', 'utf8');
+const scripts = [...source.matchAll(/<script[^>]*>([\s\S]*?)<\/script>/g)].map(match=>match[1]);
 class Element {
   constructor(tag='div') { this.tagName=tag.toUpperCase();this.children=[];this.dataset={};this.style={};this.listeners={};this.attributes={};this._value='';this._text='';this.disabled=false;this.hidden=false;this.checked=false;this.className='';this.clientWidth=700;this.clientHeight=245; }
   set value(v){this._value=String(v);}
@@ -19,13 +20,31 @@ class Element {
   setAttribute(key,value){this.attributes[key]=value;}
   reportValidity(){return true;}
   click(){}
-  getContext(){return new Proxy({}, {get:(target,key)=>target[key]||(()=>{}),set:(target,key,value)=>(target[key]=value,true)});}
+  getContext(){
+    if(!this.context){const drawing={paintCount:0,strokes:[],labels:[],clearRect(){this.paintCount++;this.strokes=[];this.labels=[];},stroke(){this.strokes.push(this.strokeStyle);},fillText(){this.labels.push(this.fillStyle);}};this.context=new Proxy(drawing,{get:(target,key)=>key in target?target[key]:(()=>{}),set:(target,key,value)=>(target[key]=value,true)});}
+    return this.context;
+  }
 }
+// Preferences must survive reload, respect explicit choices, and remain usable
+// when browser privacy settings deny storage. This script runs before the UI.
+function themeEnvironment({stored=null,systemDark=false,blocked=false,hasMedia=true}={}){
+  const html=new Element('html'),meta=new Element('meta'),store=new Map(stored===null?[]:[['garden-dashboard-theme',stored]]),listeners=[];
+  const media={matches:systemDark,addEventListener(type,fn){if(type==='change')listeners.push(fn);}};
+  const environment={document:{documentElement:html,querySelector:()=>meta},window:{},localStorage:{getItem:key=>{if(environment.blocked)throw Error('Storage denied');return store.get(key)??null;},setItem:(key,value)=>{if(environment.blocked)throw Error('Storage denied');store.set(key,value);}},blocked,store,
+    systemChange(dark){media.matches=dark;listeners.forEach(fn=>fn({matches:dark}));}};
+  if(hasMedia)environment.window.matchMedia=()=>media;
+  return environment;
+}
+function initializeTheme(options){const environment=themeEnvironment(options);vm.runInNewContext(scripts[0],environment);return environment;}
+for(const [options,expected] of [[{},'light'],[{systemDark:true},'dark'],[{stored:'light',systemDark:true},'light'],[{stored:'dark'},'dark'],[{stored:'invalid',systemDark:true},'dark'],[{blocked:true,systemDark:true},'dark'],[{hasMedia:false},'light']]){
+  const env=initializeTheme(options);assert.equal(env.document.documentElement.dataset.theme,expected);assert.equal(env.document.querySelector().attributes.content,expected==='dark'?'#14251e':'#183c31');
+}
+const themeEnvironmentLive=themeEnvironment({systemDark:true});
 const ids = new Map([...source.matchAll(/<([a-z]+)[^>]*\bid="([^"]+)"[^>]*>/g)].map(m=>[m[2],new Element(m[1])]));
 const ranges=[0,24,168].map(hours=>{const el=new Element('button');el.dataset.hours=String(hours);return el;});
-const document={getElementById:id=>ids.get(id),createElement:tag=>new Element(tag),querySelectorAll:()=>ranges,addEventListener(){},body:new Element('body'),hidden:false};
+const document={...themeEnvironmentLive.document,getElementById:id=>ids.get(id),createElement:tag=>new Element(tag),querySelectorAll:()=>ranges,addEventListener(){},body:new Element('body'),hidden:false};
 let active=0,maximum=0,requests=[],failNext=false,stallNextRead=false,readStarted=null,abortedReads=0;
-const sandbox={document,window:{devicePixelRatio:1,addEventListener(){}},navigator:{},console,URL,URLSearchParams,Blob,FormData,AbortController,confirm:()=>true,
+const sandbox={document,window:{...themeEnvironmentLive.window,devicePixelRatio:1,addEventListener(){}},localStorage:themeEnvironmentLive.localStorage,getComputedStyle:()=>({getPropertyValue:key=>{const dark=document.documentElement.dataset.theme==='dark';return key==='--chart-line'?(dark?'#3b5143':'#e1e6dc'):(dark?'#a7bbae':'#62736b');}}),navigator:{},console,URL,URLSearchParams,Blob,FormData,AbortController,confirm:()=>true,
  setTimeout:(fn,ms)=>fn.name==='tick'?0:setTimeout(fn,ms).unref(),clearTimeout,
  fetch:async(url,options)=>{active++;maximum=Math.max(maximum,active);requests.push([url,options?.method||'GET']);try{if(failNext){failNext=false;throw new Error('injected link failure');}if(stallNextRead&&(options?.method||'GET')==='GET'){stallNextRead=false;return await new Promise((resolve,reject)=>{options.signal.addEventListener('abort',()=>{abortedReads++;const error=new Error('aborted test read');error.name='AbortError';reject(error);},{once:true});readStarted();});}const r=await fetch(url.startsWith('/')?'http://127.0.0.1:8080'+url:url,options);const body=await r.json();return{ok:r.ok,status:r.status,json:async()=>body};}finally{active--;}}
 };
@@ -33,7 +52,7 @@ vm.createContext(sandbox);
 async function run(code){return vm.runInContext(code,sandbox);}
 async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]||[])await fn({preventDefault(){},currentTarget:ids.get(id)});if(ids.get('toast').className.includes('error'))throw Error(ids.get('toast').textContent);}
 (async()=>{
-  await run(source.match(/<script>([\s\S]*?)<\/script>/)[1]);
+  for(const script of scripts)await run(script);
   assert.match(ids.get('connection').textContent,/online/);
   assert.match(ids.get('environment').textContent,/24\.6/);
   assert.match(ids.get('system-metrics').textContent,/-48/);
@@ -41,6 +60,23 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
   assert.equal(await run('model.history.length'),180);
   const savedZones=await run('JSON.stringify(model.zones)'),savedSchedules=await run('JSON.stringify(model.settings.schedules)');
   try {
+    const themeRoot=document.documentElement,toggle=ids.get('theme-toggle'),chart=ids.get('history-chart').getContext(),themeRequests=requests.length;
+    assert.equal(themeRoot.dataset.theme,'dark');assert.equal(toggle.attributes['aria-pressed'],'true');
+    assert.equal(ids.get('history-legend').children[0].children[0].style.background,'#9bd3a3');assert.ok(chart.strokes.includes('#9bd3a3'));assert.ok(chart.strokes.includes('#3b5143'));assert.ok(chart.labels.every(color=>color==='#a7bbae'));
+    const beforeThemePaint=chart.paintCount;
+    themeEnvironmentLive.systemChange(false);
+    assert.equal(themeRoot.dataset.theme,'light');assert.equal(toggle.attributes['aria-pressed'],'false');assert.ok(chart.paintCount>beforeThemePaint);
+    assert.equal(ids.get('history-legend').children[0].children[0].style.background,'#286747');assert.ok(chart.strokes.includes('#286747'));assert.ok(chart.strokes.includes('#e1e6dc'));assert.ok(chart.labels.every(color=>color==='#62736b'));
+    await fire('theme-toggle');assert.equal(themeRoot.dataset.theme,'dark');assert.equal(toggle.attributes['aria-pressed'],'true');
+    assert.equal(themeEnvironmentLive.store.get('garden-dashboard-theme'),'dark');
+    themeEnvironmentLive.systemChange(false);assert.equal(themeRoot.dataset.theme,'dark');
+    assert.equal(initializeTheme({stored:themeEnvironmentLive.store.get('garden-dashboard-theme')}).document.documentElement.dataset.theme,'dark');
+    await fire('theme-toggle');assert.equal(themeRoot.dataset.theme,'light');assert.equal(toggle.attributes['aria-pressed'],'false');assert.equal(themeEnvironmentLive.store.get('garden-dashboard-theme'),'light');
+    themeEnvironmentLive.blocked=true;
+    await fire('theme-toggle');assert.equal(themeRoot.dataset.theme,'dark');assert.equal(toggle.attributes['aria-pressed'],'true');
+    themeEnvironmentLive.systemChange(false);assert.equal(themeRoot.dataset.theme,'dark');
+    themeEnvironmentLive.blocked=false;
+    assert.equal(requests.length,themeRequests,'Theme changes must not send controller requests');
     // The request queue must survive a rejection and serialize simultaneous jobs.
     failNext=true;
     await run("Promise.allSettled([request('/api/status'),request('/api/settings'),request('/api/events')])");
@@ -88,7 +124,7 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
     // Render malicious names as literal text; no HTML parsing is used.
     await run("model.zones.push({name:'<img src=x onerror=alert(1)>',channel:3,valves:[]});renderLive();renderStatus();");
     assert.match(ids.get('zones-live').textContent,/<img src=x/);
-    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','safe DOM text']},null,2));
+    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['system theme default','stored theme reload','invalid preference fallback','blocked storage fallback','theme toggle accessibility','system theme changes','manual preference overrides system','chart and legend theme redraw','theme changes stay local','startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','safe DOM text']},null,2));
   } catch(error) { console.error('AUDIT FAILURE',error);throw error; } finally {
     sandbox.restoreZones=JSON.parse(savedZones);sandbox.restoreSchedules=JSON.parse(savedSchedules);
     await run("request('/api/zones').then(zones=>post('/api/zones',{zones:restoreZones,renames:zones.some(z=>z.name==='Audit tomatoes')?{'Audit tomatoes':restoreZones[0].name}:{}}))");

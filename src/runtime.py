@@ -147,9 +147,11 @@ def run(config):
         if controller.paused and app.reboot_at is None and not (app.updater and app.updater.status["busy"]) and not (app.sensors and app.sensors.calibration) and not app.server.health().get("active_uploads", 0):
             controller.paused = False
         if led:
-            guarded("led", lambda: led.poll(ticks_ms(), controller.any_open(), controller.grace_ms > 0,
-                bool(app.wifi and app.wifi.connected), app.server.health()["listening"],
-                bool(app.updater and app.updater.status["busy"])))
+            guarded("led", lambda: led.poll(ticks_ms(), watering=controller.any_open(),
+                grace=controller.grace_ms > 0, wifi=bool(app.wifi and app.wifi.connected),
+                web=app.server.health()["listening"],
+                updating=bool(app.updater and app.updater.status["busy"]),
+                hotspot=bool(app.wifi and app.wifi.portal.active)))
         if app.reboot_at is not None and ticks_diff(ticks_ms(), app.reboot_at) >= 1000:
             controller.stop_all("reboot")
             machine.reset()

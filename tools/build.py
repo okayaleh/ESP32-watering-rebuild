@@ -99,20 +99,20 @@ def build(version, compiler=None):
     (output / "index.html").write_bytes(dashboard)
     (output / "index.html.gz").write_bytes(gzip.compress(dashboard, compresslevel=9, mtime=0))
     generated.extend([output / "index.html", output / "index.html.gz"])
-    (output / "version.json").write_text(json.dumps({"version": version}) + "\n", encoding="utf-8")
+    (output / "version.json").write_text(json.dumps({"version": version}) + "\n", encoding="utf-8", newline="\n")
     generated.append(output / "version.json")
     # boot.py is immutable recovery code, installed only with USB commissioning.
     files = [{"name": p.name, "path": "build/" + p.name,
               "size": p.stat().st_size, "sha256": hashlib.sha256(p.read_bytes()).hexdigest()}
              for p in generated if p.name not in ("boot.py", "romboot.py")]
     manifest = {"version": version, "mpy": "6.3", "files": files}
-    (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+    (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8", newline="\n")
     print("Built %s OTA files; dashboard %s -> %s bytes gzip" % (len(files), len(dashboard), (output / "index.html.gz").stat().st_size))
     print("Flash boot.py and romboot.py separately; config.py is local-only. All three are excluded from OTA.")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="2.0.0-rebuild.2")
+    parser.add_argument("--version", default="2.0.0-rebuild.3")
     parser.add_argument("--mpy-cross")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", args.version):

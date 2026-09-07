@@ -21,7 +21,7 @@ The baseline is the supplied [rebuild prompt](https://github.com/supercrossed/ES
 | LM393 rain display | `env_sensors.py`, dashboard | Implemented; display-only |
 | Flow-meter pin/volume settings | Settings and dashboard | Preserved as groundwork; pulse counting absent in original and rebuild |
 | WROOM and S3 N16R8 pin map | `settings_store.py`, dashboard | Implemented; conservative reserved-pin exclusions |
-| LED health/watering/update states | `status_led.py` | Implemented; explicit type/profile selection replaces unreliable electrical autodetection |
+| RGB network/watering states | `status_led.py` | Requested steady colors: blue watering, white hotspot, green connected, yellow disconnected; explicit type/profile selection replaces unreliable electrical autodetection |
 | First-run captive portal | `wifi_setup.py`, `web.py` | Implemented; enter SSID/password; watering remains supervised |
 | Runtime rescue AP and router-return retries | `wifi.py`, `wifi_setup.py` | Implemented; AP/STA radio parking and DHCP bounce ordering |
 | Retry/backoff, modem power-save off | `wifi.py` | Implemented; hostname set to `planter` |

@@ -1,4 +1,31 @@
-# Validation report — 2.0.0-rebuild.2
+# Validation report
+
+## 2.0.0-rebuild.3 — dark mode and RGB status
+
+This application release passed **197 host tests**, the **25-check dashboard
+DOM audit**, and real headless Chrome checks against the desktop simulator.
+The build uses the same custom MicroPython 1.28.0 platform image as .2.
+The ESP32 was not available on COM8 during this update; no .3 physical LED,
+USB deployment or radio acceptance is claimed. Earlier board observations
+below apply to .2 and are retained as their original measurements.
+
+| Check | Result and scope |
+| --- | --- |
+| Compilation and host suite | Python/device compilation, dashboard JavaScript syntax and all 197 tests passed. Local log: `test-results/host-tests-dark-rgb.txt`. |
+| RGB state selection | Seven tests cover requested colors, all overlapping status flags, steady output, bounded writes through tick wrap, retry after an LED write failure, disabled output and legacy plain/auto configurations. |
+| Supervisor integration | The actual runtime with fake pins/NeoPixel passes yellow → white → green → blue → white → green transitions, including watering through a network/listener fault and actual portal-state priority. Existing cutoff and telemetry checks still pass. |
+| Dashboard behavior | All 25 DOM audit checks pass, including saved/system/blocked-storage preferences, accessible toggle state, immediate chart/legend recoloring and no HTTP requests caused by theme changes. Existing control and stop-action queue checks pass with at most one active fetch. |
+| Real Chrome | Six captured views at 1280×900 and 390×844 cover dark/light overview and expanded dark settings. No page JavaScript errors or horizontal overflow; sampled body/card/control/button text contrast is at least 4.5:1. Keyboard toggle, reload persistence, system changes and blocked storage pass. |
+| Visual inspection | Desktop dark/light, mobile dark, and dark configuration screenshots were inspected for readable controls, theme coverage and layout. Evidence: `test-results/dashboard-*.png` and `dashboard-browser-dark-rgb.json`. |
+| Release artifacts | 21 hashed OTA application files, with a 60,164-byte dashboard and 19,038-byte gzip on the local Python build. Config and both boot helpers remain excluded from OTA. |
+
+The `.3` tests exercise the LED driver through test doubles, not a physical
+pixel. The specified four-color behavior requires an addressable RGB LED and
+the [local RGB configuration](hardware.md#rgb-status-led). Existing `config.py`
+is preserved by OTA. Desktop theme preferences live in each browser and do not
+alter controller settings or watering decisions.
+
+## 2.0.0-rebuild.2 — prior bench baseline
 
 The rebuild passed **190 host tests**, the dashboard DOM audit, and supervised bench acceptance on the user's ESP32 connected through COM8. The board is a classic ESP32-D0WD-V3 revision 3.1 with 4 MB flash, running the supplied custom MicroPython 1.28.0 ROMFS image and ESP-IDF 5.5.1. The completed board stress run verified **83 responses totaling 706,508 bytes**, followed by installation verification and normal-boot observation. After an initially unsuccessful provisioning attempt and a tested retry correction, the board subsequently connected to the home LAN, synchronized time using NTP, and served HTTP successfully to the laptop. The cause of the earlier network invisibility is not established. No sensors, valve drivers, valves, or water supply were attached. Commissioning with the actual watering hardware and longer network testing remain outstanding.
 

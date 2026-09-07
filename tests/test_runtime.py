@@ -17,15 +17,22 @@ class Done(BaseException): pass
 class RuntimeTests(unittest.TestCase):
     def test_boot_grace_manual_cutoff_and_web_fault_isolation(self):
         config = types.SimpleNamespace(**{k: v for k, v in runpy.run_path("src/config.example.py").items() if k.isupper()})
-        config.STATUS_LED_PIN = None
+        config.STATUS_LED_PIN = 2
+        config.STATUS_LED_TYPE = "rgb"
         clock = [0]
         pins, feeds, observed = {}, [], {}
+        colors = {}
         class Pin:
             OUT = 1
             def __init__(self, number, mode, value=0):
                 self.number = number
                 pins[number] = value
             def value(self, value): pins[self.number] = value
+        class Pixel:
+            def __init__(self, pin, count):
+                self_outer.assertEqual((pin.number, count), (2, 1))
+            def __setitem__(self, index, color): self.color = color
+            def write(self): colors[clock[0]] = self.color
         class WDT:
             def __init__(self, **kwargs): pass
             def feed(self): feeds.append(clock[0])
@@ -37,7 +44,10 @@ class RuntimeTests(unittest.TestCase):
                 self.connected = False
                 self.dns = types.SimpleNamespace(resolve=lambda host: None)
                 self.portal = types.SimpleNamespace(active=False)
-            def poll(self, *args): pass
+            def poll(self, *args):
+                now = clock[0]
+                self.connected = now >= 2000 and not 60500 <= now < 63000
+                self.portal.active = 1000 <= now < 3000 or 60500 <= now < 63000
             def status(self): return {"connected": False}
         class NTP:
             def __init__(self, *args, **kwargs): self.synced = False
@@ -47,7 +57,7 @@ class RuntimeTests(unittest.TestCase):
                 self.app = handler.app
                 observed["app"] = self.app
             def start(self): return True
-            def health(self): return {"listening": True, "active_uploads": 0}
+            def health(self): return {"listening": clock[0] >= 5000, "active_uploads": 0}
             def poll(self, now):
                 if now == 59000:
                     with self_outer.assertRaises(RuntimeError): self.app.water(duration=2)
@@ -64,7 +74,7 @@ class RuntimeTests(unittest.TestCase):
             if clock[0] >= 70000: raise Done()
         old_cwd = os.getcwd()
         with tempfile.TemporaryDirectory() as directory:
-            with patch.dict(sys.modules, {"machine": machine, "wifi": types.SimpleNamespace(WifiManager=Wifi, NTPClient=NTP)}):
+            with patch.dict(sys.modules, {"machine": machine, "wifi": types.SimpleNamespace(WifiManager=Wifi, NTPClient=NTP), "neopixel": types.SimpleNamespace(NeoPixel=Pixel)}):
                 import runtime
                 import moisture, web
                 with patch.object(runtime, "machine", machine), patch.object(runtime, "ticks_ms", lambda: clock[0]), patch.object(runtime, "epoch", lambda: 1900000000 + clock[0] // 1000), patch.object(runtime.time, "sleep_ms", sleep, create=True), patch.object(gc, "mem_free", lambda: 90000, create=True), patch.object(gc, "mem_alloc", lambda: 40000, create=True), patch.object(moisture, "create_bus", return_value=Bus(raw=12000)), patch.object(web, "HTTPServer", Server):
@@ -75,6 +85,12 @@ class RuntimeTests(unittest.TestCase):
                         self.assertGreater(len(feeds), 100)
                         self.assertTrue(any(e["type"] == "web_error" for e in observed["app"].state.events_ring))
                         self.assertIsNone(observed["app"].controller.inhibited)
+                        # The actual supervisor conveys AP state even with STA
+                        # connected/retrying, and watering takes precedence.
+                        self.assertEqual(colors, {
+                            0: (12, 12, 0), 1000: (12, 12, 12),
+                            3000: (0, 12, 0), 60000: (0, 0, 12),
+                            62000: (12, 12, 12), 63000: (0, 12, 0)})
                     finally:
                         os.chdir(old_cwd)
 

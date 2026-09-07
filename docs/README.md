@@ -19,6 +19,7 @@ guides and the selected release's compatibility notes before installation.
 | Resolve setup, connection, settings, sensor or restart problems | [Troubleshooting](troubleshooting.md) |
 | Verify the actual valves, wiring and network before unattended use | [Commissioning checklist](commissioning.md) |
 | Install an application update or select a previous compatible release | [Updates, retention and recovery](ota.md) |
+| Check version changes and upgrade compatibility | [Release notes](releases.md) |
 | Understand which original functions are implemented | [Feature parity](feature-parity.md) |
 | Understand timing, persistence, networking and recovery design | [Architecture and reliability](architecture.md) |
 | Integrate another client or inspect JSON endpoints | [HTTP API](api.md) |

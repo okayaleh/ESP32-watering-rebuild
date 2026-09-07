@@ -11,7 +11,7 @@ commissioning.
 The public update repository is `okayaleh/ESP32-watering-rebuild`. Its
 `v*` tag workflow builds the tagged application with the pinned compiler,
 runs host checks, and publishes `planter-<version>.zip` plus its `.sha256`
-file. For example, tag version `2.0.0-rebuild.2` as `v2.0.0-rebuild.2`.
+file. For example, tag version `2.0.0-rebuild.3` as `v2.0.0-rebuild.3`.
 Tags whose version contains a hyphen are published as prereleases. The ZIP
 also includes the existing platform image for supervised USB installation;
 this workflow does not rebuild or install that platform image.
@@ -42,7 +42,7 @@ trusted LAN HTTP mirror, so the laptop downloads and verifies a selected
 release first. From the repository directory:
 
 ```powershell
-$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.2
+$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.3
 if ($LASTEXITCODE -ne 0) { throw "Release download or verification failed" }
 python tools/mirror.py --directory "$releaseRoot" --port 8000
 ```
@@ -89,7 +89,7 @@ repository retain the additional selectable versions.
 From the repository directory, build and start the restricted mirror:
 
 ```powershell
-python tools/build.py --version 2.0.0-rebuild.2
+python tools/build.py --version 2.0.0-rebuild.3
 python tools/mirror.py --port 8000
 ```
 

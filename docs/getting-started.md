@@ -17,7 +17,7 @@ The current development bench board has already received the custom runtime and 
 
 ## Download and prepare
 
-1. Open [GitHub Releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases) and choose the intended version. Read its release status; `v2.0.0-rebuild.2` is a bench-tested prerelease.
+1. Open [GitHub Releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases) and choose the intended version. Read its release status and [release notes](releases.md); prereleases have the validation scope documented for that version.
 2. Download the **`planter-<version>.zip` asset** and its **`.zip.sha256`** file. Extract the ZIP into a working folder. The ZIP includes `build/`, `firmware/`, source, tools and documents; GitHub's separate source-code downloads are not the named release package.
 3. In PowerShell, run `Get-FileHash .\planter-<version>.zip -Algorithm SHA256` with the actual filename and compare the value with the downloaded checksum file. An application-only verified download is also available through `tools/sync_updates.py`; see [OTA](ota.md).
 4. Use a USB **data** cable and identify the board's current serial port in Windows Device Manager or Thonny. The development board was on COM8; another board or USB socket may have a different port.

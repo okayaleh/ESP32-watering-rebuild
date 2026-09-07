@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-rebuild.2",
+  "version": "2.0.0-rebuild.3",
   "mpy": "6.3",
   "files": [
     {
@@ -59,8 +59,8 @@
     {
       "name": "runtime.mpy",
       "path": "build/runtime.mpy",
-      "size": 4771,
-      "sha256": "c295a9ec2f84ca4b561a1bddc08010aabcc5af2013b464b948c54afc77a19a52"
+      "size": 4862,
+      "sha256": "e91386bafb5eb18d712162275ab1f0d5834f8b4e078050340f945aea43b6be4d"
     },
     {
       "name": "settings_store.mpy",
@@ -77,8 +77,8 @@
     {
       "name": "status_led.mpy",
       "path": "build/status_led.mpy",
-      "size": 710,
-      "sha256": "3700dd3e721f64d582d2d920de892b31a61049ac07cbabbaaa8f9733a68f0509"
+      "size": 683,
+      "sha256": "f908094a9348cf8960c56c2ec1e468e623e8706cdb481c1af5bc133366dfd247"
     },
     {
       "name": "updater.mpy",
@@ -113,20 +113,20 @@
     {
       "name": "index.html",
       "path": "build/index.html",
-      "size": 56421,
-      "sha256": "ce7a6356f09688da3382f65550e2a666c032704d669e51503b843ccafd08eb19"
+      "size": 60164,
+      "sha256": "62e66f56d954d6d10125474a6dcf37c4ea5b18be6162c40d4da37de11621cfa2"
     },
     {
       "name": "index.html.gz",
       "path": "build/index.html.gz",
-      "size": 17748,
-      "sha256": "3dd6a35fef640ba399c0177cc6a303a83acfa78d9228f679a5daafda72d4ee81"
+      "size": 19038,
+      "sha256": "5eab33a5b146907b60917e3b523ce985d22ab375c5f3d815f09503c767490846"
     },
     {
       "name": "version.json",
       "path": "build/version.json",
-      "size": 32,
-      "sha256": "458d0a41aa5da05d917e829c4672d4c9ff0766d0b387ae52417a8b41cf55d81c"
+      "size": 31,
+      "sha256": "f4e517af7ac7f272083694827855384ea0352729be36d7d50d643e4e993cde13"
     }
   ]
 }
