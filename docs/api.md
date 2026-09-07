@@ -25,7 +25,7 @@ The public API retains the original routes below. JSON is UTF-8 and responses cl
 | `/api/config/export` | GET downloadable runtime settings, no credentials |
 | `/api/config/import` | POST validated full configuration; save then reboot |
 | `/api/wifi` | GET SSID/state without password; POST `{ssid,password}` or setup form; save/readback/reboot |
-| `/api/update/check` | POST `{}` checks newest release; optional `{version:"2.0.0-rebuild.4"}` checks a retained GitHub channel version; observe `/api/status.update` |
+| `/api/update/check` | POST `{}` checks newest release; optional `{version:"2.0.0-rebuild.5"}` checks a retained GitHub channel version; observe `/api/status.update` |
 | `/api/update/apply` | POST install checked or staged files while idle |
 | `/api/upload` | POST multipart code upload into staging; apply separately |
 | `/api/reboot` | POST close outputs, cancel batch and reboot after response window |

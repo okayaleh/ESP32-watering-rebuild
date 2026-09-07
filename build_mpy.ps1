@@ -1,4 +1,4 @@
-param([string]$Version = '2.0.0-rebuild.4', [string]$Python = 'python')
+param([string]$Version = '2.0.0-rebuild.5', [string]$Python = 'python')
 $ErrorActionPreference = 'Stop'
 Set-Location -LiteralPath $PSScriptRoot
 if ($Python -eq 'python' -and (Test-Path -LiteralPath "$env:LOCALAPPDATA/Programs/Thonny/python.exe")) {

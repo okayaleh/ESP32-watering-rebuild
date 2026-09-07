@@ -1,6 +1,6 @@
 # Validation report
 
-## 2.0.0-rebuild.4 — independent GitHub updates
+## 2.0.0-rebuild.5 — independent GitHub updates
 
 This release adds direct HTTPS downloads, a bounded immutable-commit channel,
 platform compatibility checks, automatic check/retry/install scheduling and
@@ -14,11 +14,18 @@ The supplied native MicroPython image and USB boot helpers are unchanged.
 | Browser update card | Real headless Chrome at 1280×900 and 390×844, in light and dark modes, rendered the update card and expanded retained-release controls without JavaScript errors or horizontal overflow. Desktop dark and mobile light captures were visually inspected. The release/status fixtures are simulated; no GitHub or ESP32 installation is implied. Evidence: `dashboard-browser-github.json` and `dashboard-github-*.png`. |
 | Documentation links | All 102 relative README/document links and Markdown heading anchors resolved. |
 
-The complete host suite passed **232 tests**, including real loopback TLS
+The prepublication .4 candidate passed **232 host tests**, including real loopback TLS
 acceptance/rejection for an untrusted CA, wrong hostname, expired certificate,
 redirect, truncated body and unexpected compression. The actual supervisor
 also checks fresh installation scheduling and preserves its watering pause
 when a concurrent maintenance request is rejected.
+
+The .4 tag was retained but no release or channel entry was published: CI
+rejected a gzip artifact mismatch between Windows Python 3.14's zlib-ng and
+Linux Python 3.12's zlib. Version .5 pins Zopfli 0.4.3 for reproducible
+compressed dashboard bytes across the supported build platforms. The .4
+candidate's physical observations below remain historical evidence; they
+are not a claim that the final .5 release was installed or tested.
 
 On 2026-09-07, COM8 became available and the bench ESP32 connected to home
 Wi-Fi. A supervised native TLS download fetched the 3,867-byte GitHub manifest
@@ -38,7 +45,7 @@ its update hold. Afterward it reported 60,880 bytes free Python heap,
 Maximum observed loop duration was 1,782 ms while updates held valves closed.
 This is a brief bench observation, not a watering deadline measurement.
 
-Publication of the immutable .4 channel and a complete download/install/reboot
+Publication of the immutable .5 channel and a complete download/install/reboot
 from that channel remain the final release acceptance steps at this snapshot.
 Their subsequent results belong in this report. The board has no connected
 watering hardware, and automatic watering remains disabled. Multi-day Wi-Fi

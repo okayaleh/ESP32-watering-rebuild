@@ -6,7 +6,7 @@ A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.
 
 ## Project status
 
-The current application is **2.0.0-rebuild.4**, a **prerelease** adding independent GitHub updates over verified HTTPS, automatic idle-time installation and selection of retained compatible releases. Dashboard dark mode and GPIO2 RGB status colors remain included. See the [release notes](docs/releases.md) for the one-time upgrade from earlier versions. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
+The current application is **2.0.0-rebuild.5**, a **prerelease** adding independent GitHub updates over verified HTTPS, automatic idle-time installation and selection of retained compatible releases. Dashboard dark mode and GPIO2 RGB status colors remain included. See the [release notes](docs/releases.md) for the one-time upgrade from earlier versions. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
 The previous application, **2.0.0-rebuild.2**, was installed on a classic ESP32-D0WD-V3 with 4 MB flash. Its validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. That bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**. Current release checks and the distinction from earlier hardware measurements are recorded in the [validation report](docs/validation.md).
 
@@ -100,13 +100,13 @@ After first boot, editing a default zone in `config.py` does not replace saved r
 
 [GitHub Releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases) retain the **current update and at least two previous updates** as releases accumulate. Older releases and local download caches are kept too; there is no automatic pruning. Published release tags and assets are protected by GitHub release immutability. The first published application is `v2.0.0-rebuild.2`; earlier recovery choices appear as actual subsequent versions are released.
 
-From .4 onward, the controller downloads compatible application releases directly from GitHub over certificate-verified HTTPS. Connect it to home Wi-Fi with internet access and allow its clock to synchronize. **A laptop, USB connection and GitHub account are unnecessary for normal updates.** External power works the same way as USB power.
+From .5 onward, the controller downloads compatible application releases directly from GitHub over certificate-verified HTTPS. Connect it to home Wi-Fi with internet access and allow its clock to synchronize. **A laptop, USB connection and GitHub account are unnecessary for normal updates.** External power works the same way as USB power.
 
 Fresh configurations enable daily checks and installation at **04:00 controller local time**, with catch-up after reconnection. Updates wait for idle watering and pause new runs until the update completes. In **Maintenance → Firmware updates**, the dashboard shows the update source, installed version and automatic mode. A manual **Check for updates** requires an explicit **Install update** afterward.
 
-The channel keeps the current compatible release and up to two predecessors. **Choose a retained release** checks a selected older version before installation. A deliberate rollback pauses automatic updates until the latest release is selected and installed. Failed-boot versions are excluded from retry. The channel begins with .4; older .2/.3 archives remain available through USB or the optional LAN mirror, and do not appear in the standalone selector.
+The channel keeps the current compatible release and up to two predecessors. **Choose a retained release** checks a selected older version before installation. A deliberate rollback pauses automatic updates until the latest release is selected and installed. Failed-boot versions are excluded from retry. The channel begins with .5; older .2/.3 archives remain available through USB or the optional LAN mirror, and do not appear in the standalone selector.
 
-For an existing .2/.3 controller, install .4 once over USB or the existing mirror and update its local configuration as described in the [complete update guide](docs/ota.md). Application OTA preserves `config.py`, including an existing automatic-install opt-out or mirror URL. It also preserves Wi-Fi credentials, garden settings and schedules. Native platform and boot-helper changes still require USB maintenance.
+For an existing .2/.3 controller, install .5 once over USB or the existing mirror and update its local configuration as described in the [complete update guide](docs/ota.md). Application OTA preserves `config.py`, including an existing automatic-install opt-out or mirror URL. It also preserves Wi-Fi credentials, garden settings and schedules. Native platform and boot-helper changes still require USB maintenance.
 
 Repository archives provide multiple recovery choices; the board retains one previous set of changed application files for interrupted-update and failed-boot recovery. Check compatibility before choosing an older release. A successful boot trial establishes startup of the safety loop, not long-term field reliability.
 
@@ -118,11 +118,11 @@ Use Python 3.10+ and Node.js 22+. From a new checkout:
 git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
 cd ESP32-watering-rebuild
 python -m pip install -r requirements-dev.txt
-python tools/build.py --version 2.0.0-rebuild.4
+python tools/build.py --version 2.0.0-rebuild.5
 python tools/check.py
 ```
 
-The build pins `mpy-cross` to MicroPython 1.28.0 and emits portable `.mpy` v6.3 files. If `src/config.py` does not exist, the blank-credential `src/config.example.py` supplies defaults. To customize local board options, copy the example to `src/config.py` before building. The build copies local configuration to the ignored `build/config.py`; it scrubs the public example and rejects credentials that remain elsewhere in that example.
+The build pins `mpy-cross` to MicroPython 1.28.0 and emits portable `.mpy` v6.3 files. Zopfli 0.4.3 produces reproducible dashboard gzip bytes on Windows and Linux. If `src/config.py` does not exist, the blank-credential `src/config.example.py` supplies defaults. To customize local board options, copy the example to `src/config.py` before building. The build copies local configuration to the ignored `build/config.py`; it scrubs the public example and rejects credentials that remain elsewhere in that example.
 
 `tools/check.py` compiles Python source, checks dashboard JavaScript syntax and runs the host test suite. Physical testing remains a separate commissioning step. `python tools/package.py` verifies application and platform hashes and writes a release ZIP plus SHA-256 file under `release/`, including a scrubbed default config.
 

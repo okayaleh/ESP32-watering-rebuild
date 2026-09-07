@@ -3,7 +3,7 @@
 [Documents](README.md) · [Updates and rollback](ota.md) ·
 [All GitHub releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases)
 
-## 2.0.0-rebuild.4 — independent GitHub updates
+## 2.0.0-rebuild.5 — independent GitHub updates
 
 - The ESP32 can fetch application updates directly from the public GitHub
   repository over HTTPS with certificate, hostname and date verification.
@@ -24,25 +24,37 @@
 - Dark mode, RGB status colors, Wi-Fi credentials, garden settings and
   schedules are preserved. The native platform and USB boot helpers are
   unchanged; those parts remain USB maintenance only.
+- The build pins Zopfli 0.4.3 so Windows and Linux generate identical gzip
+  dashboard bytes. Release verification rejects artifacts differing from
+  the tagged manifest before publication.
 
 ### Upgrade from .2 or .3
 
-Use USB or the existing LAN mirror once to install .4. Existing local
+Use USB or the existing LAN mirror once to install .5. Existing local
 `config.py` is protected from OTA. Configure `UPDATE_GITHUB_REPO`, clear any
 `UPDATE_BASE_URL`, set `UPDATE_AUTO_INSTALL = True` if desired and restart;
 see the exact [one-time upgrade steps](ota.md#one-time-upgrade-from-2-or-3).
 Keeping automatic installation off remains supported.
 
-The standalone channel begins with .4 because earlier manifests do not
-include the required platform metadata. The .2 and .3 release archives are
+The standalone channel begins with .5. The older .2/.3 manifests do not
+include the required platform metadata, and .4 was not published. The .2 and .3 release archives are
 retained for USB/mirror recovery. Reverting to either removes direct GitHub
-updating until .4 or later is installed again. More dashboard recovery choices
+updating until .5 or later is installed again. More dashboard recovery choices
 appear as actual compatible releases are published.
 
 The [validation report](validation.md) separates host checks from physical
 ESP32 testing. Hardware TLS transfer, update/reboot, memory and network
 acceptance must be recorded before claiming this version was verified on a
 particular board.
+
+## 2.0.0-rebuild.4 — unpublished candidate
+
+The .4 tag remains for history, but CI blocked publication because Windows
+Python 3.14 and Linux Python 3.12 produced different compressed dashboard
+bytes using zlib-ng and zlib. No .4 release or update-channel entry was
+published, and its tag was not rewritten. The .5 build fixes reproducibility
+with pinned Zopfli. Supervised USB/TLS measurements from the installed .4
+candidate are retained in the [validation report](validation.md).
 
 ## 2.0.0-rebuild.3 — dark mode and RGB status
 

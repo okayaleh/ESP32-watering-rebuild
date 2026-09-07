@@ -1,6 +1,6 @@
 # Firmware updates and recovery
 
-From **2.0.0-rebuild.4**, the controller can check and install application
+From **2.0.0-rebuild.5**, the controller can check and install application
 releases directly from GitHub over verified HTTPS. It needs home Wi-Fi with
 internet access, a synchronized clock and reliable power. **No laptop,
 USB connection, GitHub account or token is needed during normal updates.**
@@ -19,7 +19,7 @@ and any failure. Choose **Check for updates** to check the newest release.
 A manual check does not install it: review the selected version, then choose
 **Install update** and keep the controller powered through its restart.
 
-Fresh .4 configurations enable an automatic check and installation at
+Fresh .5 configurations enable an automatic check and installation at
 **04:00 controller local time**, using the fixed UTC offset in watering
 settings. The controller catches up after boot or reconnection and retries
 failed checks after five minutes, then every thirty minutes if failures
@@ -37,9 +37,9 @@ new corrected version. See [troubleshooting](troubleshooting.md#firmware-updates
 
 ### One-time upgrade from .2 or .3
 
-Those versions only understand a LAN HTTP mirror. Install .4 once using its
+Those versions only understand a LAN HTTP mirror. Install .5 once using its
 verified release files over USB, or use the optional mirror procedure below
-with the .4 release. No native platform reflash or erase is required for a
+with the .5 release. No native platform reflash or erase is required for a
 controller already running the supplied .2/.3 platform.
 
 OTA preserves local `config.py`, so save these values to the board over USB
@@ -73,11 +73,11 @@ controller stays on that release. To resume, check and install the latest
 channel release. The dashboard reports the hold. Update policy is retained
 separately from application files in `.ota-policy.json`.
 
-The standalone channel starts at .4. Older .2/.3 archives remain available
+The standalone channel starts at .5. Older .2/.3 archives remain available
 for supervised USB or mirror restoration, but their manifests do not declare
 the platform compatibility required by the standalone channel and they do not
 appear in its selector. Installing either removes standalone updating until
-.4 or later is installed again. Fewer dashboard choices appear until more
+.5 or later is installed again. Fewer dashboard choices appear until more
 compatible releases have actually been published.
 
 A previous application must remain compatible with saved settings, the
@@ -91,8 +91,8 @@ startup of the safety loop, not long-term field reliability.
 
 The public repository is `okayaleh/ESP32-watering-rebuild`. Its `v*` tag
 workflow builds the tagged application, runs host checks and publishes
-`planter-<version>.zip` plus `.sha256`. Tag application `2.0.0-rebuild.4` as
-`v2.0.0-rebuild.4`. Hyphenated versions are prereleases; this project's update
+`planter-<version>.zip` plus `.sha256`. Tag application `2.0.0-rebuild.5` as
+`v2.0.0-rebuild.5`. Hyphenated versions are prereleases; this project's update
 channel intentionally includes the published rebuild prereleases.
 
 The workflow also publishes the small `channel.json` document at the root of
@@ -124,12 +124,12 @@ download command below verifies the archive and application files.
 ## Optional LAN mirror and archived releases
 
 The mirror remains useful for a local build, restricted internet access or
-restoring a release older than .4. It requires a running reachable computer
+restoring a release older than .5. It requires a running reachable computer
 through installation; the controller need not be attached to that computer
 by USB. Public downloads need no GitHub token.
 
 ```powershell
-$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.4
+$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.5
 if ($LASTEXITCODE -ne 0) { throw "Release download or verification failed" }
 python tools/mirror.py --directory "$releaseRoot" --port 8000
 ```
@@ -143,7 +143,7 @@ mirror before starting one pinned to a different release directory.
 For an unpublished local build, use:
 
 ```powershell
-python tools/build.py --version 2.0.0-rebuild.4
+python tools/build.py --version 2.0.0-rebuild.5
 python tools/mirror.py --port 8000
 ```
 
@@ -160,7 +160,7 @@ Allow the port through the computer's private-network firewall. Check the
 release in the dashboard and install while idle. Choose an explicit older
 `--tag` for an archived recovery version; any retained compatible tag can be
 downloaded, including one older than the three listed choices. Clear
-`UPDATE_BASE_URL` and restart to restore direct GitHub mode on .4 or later.
+`UPDATE_BASE_URL` and restart to restore direct GitHub mode on .5 or later.
 
 ## What installation does
 

@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-rebuild.4",
+  "version": "2.0.0-rebuild.5",
   "mpy": "6.3",
   "files": [
     {
@@ -125,14 +125,14 @@
     {
       "name": "index.html.gz",
       "path": "build/index.html.gz",
-      "size": 20192,
-      "sha256": "f1070dea6ce7fbe473c51e874574eab826fd23182e3847eb57555b0133a8a921"
+      "size": 19443,
+      "sha256": "6da6d934415eca1f34b0aa5602d937478c3b4cb446025153cbb99901b515d966"
     },
     {
       "name": "version.json",
       "path": "build/version.json",
       "size": 31,
-      "sha256": "932fdeec145337c6b04b4b7d0c588669796b8e45d1addcf3ec345d75622d3b31"
+      "sha256": "507bf2152d71435db3cc72818254ff9d13b69bff06e5afea718ca1c3da58ced5"
     }
   ],
   "platform": "planter-esp32-romfs-mpy6",

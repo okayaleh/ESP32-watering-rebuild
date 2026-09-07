@@ -197,11 +197,11 @@ Do not bypass a safety refusal by driving GPIOs directly. Follow the
 ## Firmware updates
 
 **“Updates require a plain HTTP mirror”** comes from .2/.3 firmware. Those
-versions cannot fetch GitHub directly. Install .4 once using USB or the
+versions cannot fetch GitHub directly. Install .5 once using USB or the
 existing LAN mirror and follow its [configuration step](ota.md#one-time-upgrade-from-2-or-3).
 Changing from USB power to a separate supply does not upgrade firmware.
 
-On .4 or later, **Firmware updates** should show **Direct from GitHub**. A
+On .5 or later, **Firmware updates** should show **Direct from GitHub**. A
 local-network source means `UPDATE_BASE_URL` is still set; clear it in the
 board's `config.py`, save and restart to select GitHub. Confirm that the
 repository option names `okayaleh/ESP32-watering-rebuild`.
@@ -212,7 +212,7 @@ repository option names `okayaleh/ESP32-watering-rebuild`.
 | Waiting for the clock | HTTPS needs a correct date. Allow NTP synchronization; check internet access and any router rules blocking NTP. Do not disable TLS verification. |
 | Certificate or TLS failure | Preserve the error and installed version. Check device time, internet filtering and available memory. A changed GitHub certificate chain may require a reviewed trust-bundle update. |
 | Timeout or download failure | Check Wi-Fi signal and internet availability. Automatic checks retry; manual checks may be retried once connectivity returns. Keep normal power on. |
-| No retained-release selector | Run a successful check first. It appears only when another compatible channel release exists; the initial .4 channel has one entry. |
+| No retained-release selector | Run a successful check first. It appears only when another compatible channel release exists; the initial .5 channel has one entry. |
 | Automatic updates paused | A previous channel release was deliberately installed. Check and install the latest release to resume. |
 | Excluded after a failed boot | The board recovered from an unsuccessful release. That version is not retried; use a newly published corrected release. |
 | Plain HTTP mirror unavailable | This optional mode needs the serving computer running and reachable through its LAN firewall. Clear the mirror URL to use direct GitHub mode. |

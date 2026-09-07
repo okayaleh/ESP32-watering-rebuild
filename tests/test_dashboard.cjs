@@ -80,14 +80,14 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
     // Update status explains standalone operation, preserves a selected release
     // through polling, and requires an explicit install after manual checks.
     const originalStatus=await run('JSON.stringify(model.status)');
-    await run("model.status={wifi_connected:true,time_synced:true,update:{source:'github',repository:'okayaleh/ESP32-watering-rebuild',installed_version:'2.0.0-rebuild.4',available_version:'2.0.0-rebuild.5',available_versions:['2.0.0-rebuild.5','2.0.0-rebuild.4','2.0.0-rebuild.3'],available:true,auto_install:true,check_hour:4,state:'available'}};renderUpdate();");
+    await run("model.status={wifi_connected:true,time_synced:true,update:{source:'github',repository:'okayaleh/ESP32-watering-rebuild',installed_version:'2.0.0-rebuild.6',available_version:'2.0.0-rebuild.7',available_versions:['2.0.0-rebuild.7','2.0.0-rebuild.6','2.0.0-rebuild.5'],available:true,auto_install:true,check_hour:4,state:'available'}};renderUpdate();");
     assert.match(ids.get('update-source').textContent,/Direct from GitHub/);
     assert.match(ids.get('update-automation').textContent,/04:00/);
-    assert.match(ids.get('update-summary').textContent,/2\.0\.0-rebuild\.5.*ready to install/);
+    assert.match(ids.get('update-summary').textContent,/2\.0\.0-rebuild\.7.*ready to install/);
     assert.equal(ids.get('update-releases').hidden,false);
-    assert.deepEqual(ids.get('update-version').children.map(option=>option.value),['2.0.0-rebuild.5','2.0.0-rebuild.3']);
-    ids.get('update-version').value='2.0.0-rebuild.3';await run('renderUpdate()');
-    assert.equal(ids.get('update-version').value,'2.0.0-rebuild.3');
+    assert.deepEqual(ids.get('update-version').children.map(option=>option.value),['2.0.0-rebuild.7','2.0.0-rebuild.5']);
+    ids.get('update-version').value='2.0.0-rebuild.5';await run('renderUpdate()');
+    assert.equal(ids.get('update-version').value,'2.0.0-rebuild.5');
     await run("model.status.update.busy=true;model.status.update.state='downloading';renderUpdate();");
     assert.equal(ids.get('update-check').disabled,true);assert.equal(ids.get('update-apply').disabled,true);
     assert.match(ids.get('update-summary').textContent,/Downloading and verifying/);
@@ -99,15 +99,15 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
     assert.match(ids.get('update-summary').textContent,/clock to synchronize/);
     await run("model.status.time_synced=true;model.status.update.state='checked';renderUpdate();");
     assert.match(ids.get('update-summary').textContent,/matches the selected release/);
-    await run("model.status.update.automatic_paused=true;model.status.update.held_version='2.0.0-rebuild.3';renderUpdate();");
-    assert.match(ids.get('update-automation').textContent,/paused.*2\.0\.0-rebuild\.3/);
+    await run("model.status.update.automatic_paused=true;model.status.update.held_version='2.0.0-rebuild.5';renderUpdate();");
+    assert.match(ids.get('update-automation').textContent,/paused.*2\.0\.0-rebuild\.5/);
     await run("model.status.update.automatic_paused=false;model.status.update.auto_install=false;renderUpdate();");
     assert.match(ids.get('update-automation').textContent,/Automatic installation is off/);
     await run("globalThis.updateAudit=[];globalThis.savedUpdatePost=post;post=async(path,body)=>{updateAudit.push({path,body});return {ok:true};}");
     try{
       await fire('update-select');
       assert.equal(await run('updateAudit[0].path'),'/api/update/check');
-      assert.equal(await run('updateAudit[0].body.version'),'2.0.0-rebuild.3');
+      assert.equal(await run('updateAudit[0].body.version'),'2.0.0-rebuild.5');
       await fire('update-check');
       assert.equal(await run('JSON.stringify(updateAudit[1].body)'),'{}');
       assert.equal(await run('updateAudit.length'),2,'Checks must not trigger an installation');

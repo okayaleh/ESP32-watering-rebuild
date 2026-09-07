@@ -13,6 +13,24 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 
+def dashboard_gzip(data):
+    # Thonny ships zlib-ng, while GitHub's Python uses zlib. Pin a separate
+    # encoder so raw GitHub files and packaged CI files have identical bytes.
+    try:
+        from zopfli.gzip import compress
+    except ImportError:
+        sys.path.insert(0, str(ROOT / ".tools/python"))
+        from zopfli.gzip import compress
+    from importlib.metadata import version
+    if version("zopfli") != "0.4.3":
+        raise ValueError("Install pinned build dependencies: pip install -r requirements-dev.txt")
+    compressed = bytearray(compress(data, numiterations=15, blocksplitting=1,
+                                    blocksplittinglast=0, blocksplittingmax=15))
+    compressed[9] = 255
+    if gzip.decompress(compressed) != data or compressed[4:8] != b"\0\0\0\0":
+        raise ValueError("Invalid deterministic dashboard gzip")
+    return compressed
+
 def scrub_config(source):
     tree = ast.parse(source)
     lines = source.splitlines(keepends=True)
@@ -97,11 +115,7 @@ def build(version, compiler=None):
         generated.append(target)
     dashboard = (source / "index.html").read_bytes()
     (output / "index.html").write_bytes(dashboard)
-    compressed = bytearray(gzip.compress(dashboard, compresslevel=9, mtime=0))
-    # Python 3.11/3.12 let zlib stamp a platform-specific OS byte with mtime=0.
-    # GitHub's Linux rebuild must match the Windows commit byte for byte.
-    compressed[9] = 255
-    (output / "index.html.gz").write_bytes(compressed)
+    (output / "index.html.gz").write_bytes(dashboard_gzip(dashboard))
     generated.extend([output / "index.html", output / "index.html.gz"])
     (output / "version.json").write_text(json.dumps({"version": version}) + "\n", encoding="utf-8", newline="\n")
     generated.append(output / "version.json")
@@ -118,7 +132,7 @@ def build(version, compiler=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="2.0.0-rebuild.4")
+    parser.add_argument("--version", default="2.0.0-rebuild.5")
     parser.add_argument("--mpy-cross")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", args.version):
