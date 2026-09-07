@@ -1,0 +1,105 @@
+--- lfs1.c ---
+/*
+ * The little filesystem
+ *
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+
+--- lfs1.h ---
+/*
+ * The little filesystem
+ *
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+#ifndef LFS1_H
+#define LFS1_H
+
+
+
+--- lfs1_util.c ---
+/*
+ * lfs1 util functions
+ *
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+
+--- lfs1_util.h ---
+/*
+ * lfs1 utility functions
+ *
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+#ifndef LFS1_UTIL_H
+#define LFS1_UTIL_H
+
+// Users can override lfs1_util.h with their own configuration by defining
+// LFS1_CONFIG as a header file to include (-DLFS1_CONFIG=lfs1_config.h).
+//
+// If LFS1_CONFIG is used, none of the default utils will be emitted and must be
+// provided by the config file. To start I would suggest copying lfs1_util.h and
+// modifying as needed.
+#ifdef LFS1_CONFIG
+#define LFS1_STRINGIZE(x) LFS1_STRINGIZE2(x)
+#define LFS1_STRINGIZE2(x) #x
+
+
+--- lfs2.c ---
+/*
+ * The little filesystem
+ *
+ * Copyright (c) 2022, The littlefs authors.
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+
+--- lfs2.h ---
+/*
+ * The little filesystem
+ *
+ * Copyright (c) 2022, The littlefs authors.
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+#ifndef LFS2_H
+#define LFS2_H
+
+
+
+--- lfs2_util.c ---
+/*
+ * lfs2 util functions
+ *
+ * Copyright (c) 2022, The littlefs authors.
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+
+
+--- lfs2_util.h ---
+/*
+ * lfs2 utility functions
+ *
+ * Copyright (c) 2022, The littlefs authors.
+ * Copyright (c) 2017, Arm Limited. All rights reserved.
+ * SPDX-License-Identifier: BSD-3-Clause
+ */
+#ifndef LFS2_UTIL_H
+#define LFS2_UTIL_H
+
+#define LFS2_STRINGIZE(x) LFS2_STRINGIZE2(x)
+#define LFS2_STRINGIZE2(x) #x
+
+// Users can override lfs2_util.h with their own configuration by defining
+// LFS2_CONFIG as a header file to include (-DLFS2_CONFIG=lfs2_config.h).
+//
+// If LFS2_CONFIG is used, none of the default utils will be emitted and must be
+// provided by the config file. To start, I would suggest copying lfs2_util.h
+// and modifying as needed.
+#ifdef LFS2_CONFIG

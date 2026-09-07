@@ -1,0 +1,7 @@
+# OTA manifests hash file bytes; checkout must not rewrite line endings.
+* -text
+*.mpy binary
+*.bin binary
+*.app-bin binary
+*.gz binary
+*.zip binary

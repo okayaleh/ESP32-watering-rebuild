@@ -1,0 +1,191 @@
+diff --git a/ports/esp32/esp32_partition.c b/ports/esp32/esp32_partition.c
+index f33e9da..826da97 100644
+--- a/ports/esp32/esp32_partition.c
++++ b/ports/esp32/esp32_partition.c
+@@ -55,15 +55,13 @@ typedef struct _esp32_partition_obj_t {
+ 
+ #if MICROPY_VFS_ROM_IOCTL
+ 
+-static esp32_partition_obj_t esp32_partition_romfs_obj = {
+-    .base = { .type = NULL },
+-    .part = NULL,
+-    .cache = NULL,
+-    .block_size = NATIVE_BLOCK_SIZE_BYTES,
+-};
+-
+-static const void *esp32_partition_romfs_ptr = NULL;
+-static esp_partition_mmap_handle_t esp32_partition_romfs_handle;
++// Planter: two independent mapped banks preserve the previous complete ROMFS
++// while the immutable boot helper rebuilds the other after a filesystem OTA.
++#define PLANTER_ROMFS_BANKS (2)
++static const char *const esp32_partition_romfs_labels[PLANTER_ROMFS_BANKS] = { "romfs", "romfs_b" };
++static esp32_partition_obj_t esp32_partition_romfs_obj[PLANTER_ROMFS_BANKS];
++static const void *esp32_partition_romfs_ptr[PLANTER_ROMFS_BANKS];
++static esp_partition_mmap_handle_t esp32_partition_romfs_handle[PLANTER_ROMFS_BANKS];
+ 
+ #endif
+ 
+@@ -131,18 +129,20 @@ static mp_obj_t esp32_partition_make_new(const mp_obj_type_t *type, size_t n_arg
+ #if MICROPY_VFS_ROM_IOCTL
+ static mp_int_t esp32_partition_get_buffer(mp_obj_t self_in, mp_buffer_info_t *bufinfo, mp_uint_t flags) {
+     esp32_partition_obj_t *self = MP_OBJ_TO_PTR(self_in);
+-    if (self == &esp32_partition_romfs_obj && flags == MP_BUFFER_READ) {
+-        if (esp32_partition_romfs_ptr == NULL) {
+-            check_esp_err(esp_partition_mmap(self->part, 0, self->part->size, ESP_PARTITION_MMAP_DATA, &esp32_partition_romfs_ptr, &esp32_partition_romfs_handle));
++    if (flags == MP_BUFFER_READ) {
++        for (size_t bank = 0; bank < PLANTER_ROMFS_BANKS; ++bank) {
++            if (self == &esp32_partition_romfs_obj[bank] && self->part != NULL) {
++                if (esp32_partition_romfs_ptr[bank] == NULL) {
++                    check_esp_err(esp_partition_mmap(self->part, 0, self->part->size, ESP_PARTITION_MMAP_DATA, &esp32_partition_romfs_ptr[bank], &esp32_partition_romfs_handle[bank]));
++                }
++                bufinfo->buf = (void *)esp32_partition_romfs_ptr[bank];
++                bufinfo->len = self->part->size;
++                bufinfo->typecode = 'B';
++                return 0;
++            }
+         }
+-        bufinfo->buf = (void *)esp32_partition_romfs_ptr;
+-        bufinfo->len = self->part->size;
+-        bufinfo->typecode = 'B';
+-        return 0;
+-    } else {
+-        // Unsupported.
+-        return 1;
+     }
++    return 1; // Ordinary Partition objects are not implicitly mapped.
+ }
+ #endif
+ 
+@@ -338,30 +338,29 @@ MP_DEFINE_CONST_OBJ_TYPE(
+ #if MICROPY_VFS_ROM_IOCTL
+ 
+ mp_obj_t mp_vfs_rom_ioctl(size_t n_args, const mp_obj_t *args) {
+-    if (esp32_partition_romfs_obj.base.type == NULL) {
+-        esp32_partition_romfs_obj.base.type = &esp32_partition_type;
+-        // Get the romfs partition.
+-        // TODO: number of segments ioctl can be used if there is more than one romfs.
+-        esp_partition_iterator_t iter = esp_partition_find(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, "romfs");
+-        if (iter != NULL) {
+-            esp32_partition_romfs_obj.part = esp_partition_get(iter);
++    size_t count = 0;
++    for (size_t bank = 0; bank < PLANTER_ROMFS_BANKS; ++bank) {
++        esp32_partition_obj_t *rom = &esp32_partition_romfs_obj[bank];
++        if (rom->base.type == NULL) {
++            rom->base.type = &esp32_partition_type;
++            rom->block_size = NATIVE_BLOCK_SIZE_BYTES;
++            rom->part = esp_partition_find_first(ESP_PARTITION_TYPE_DATA, ESP_PARTITION_SUBTYPE_ANY, esp32_partition_romfs_labels[bank]);
+         }
+-        esp_partition_iterator_release(iter);
++        if (rom->part == NULL) {
++            break;
++        }
++        ++count;
+     }
+-
+     switch (mp_obj_get_int(args[0])) {
+         case MP_VFS_ROM_IOCTL_GET_NUMBER_OF_SEGMENTS:
+-            if (esp32_partition_romfs_obj.part == NULL) {
+-                return MP_OBJ_NEW_SMALL_INT(0);
+-            } else {
+-                return MP_OBJ_NEW_SMALL_INT(1);
+-            }
+-        case MP_VFS_ROM_IOCTL_GET_SEGMENT:
+-            if (esp32_partition_romfs_obj.part == NULL) {
++            return MP_OBJ_NEW_SMALL_INT(count);
++        case MP_VFS_ROM_IOCTL_GET_SEGMENT: {
++            mp_int_t bank = n_args >= 2 ? mp_obj_get_int(args[1]) : -1;
++            if (bank < 0 || (size_t)bank >= count) {
+                 return MP_OBJ_NEW_SMALL_INT(-MP_EINVAL);
+-            } else {
+-                return MP_OBJ_FROM_PTR(&esp32_partition_romfs_obj);
+             }
++            return MP_OBJ_FROM_PTR(&esp32_partition_romfs_obj[bank]);
++        }
+         default:
+             return MP_OBJ_NEW_SMALL_INT(-MP_EINVAL);
+     }
+diff --git a/ports/esp32/gccollect.c b/ports/esp32/gccollect.c
+index e6c17fd..cac4730 100644
+--- a/ports/esp32/gccollect.c
++++ b/ports/esp32/gccollect.c
+@@ -82,7 +82,12 @@ void gc_collect(void) {
+ // The largest new region that is available to become Python heap is the largest
+ // free block in the ESP-IDF system heap.
+ size_t gc_get_max_new_split(void) {
+-    return heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
++    // Planter: Python heap growth must leave a contiguous native allocation
++    // margin for WiFi/lwIP. Otherwise stock split-heap doubling takes the
++    // entire last native block and socket creation fails with ENOBUFS.
++    const size_t native_reserve = 32 * 1024 + 64;
++    size_t largest = heap_caps_get_largest_free_block(MALLOC_CAP_DEFAULT);
++    return largest > native_reserve ? largest - native_reserve : 0;
+ }
+ 
+ #endif
+diff --git a/py/mkrules.cmake b/py/mkrules.cmake
+index e3d769c..a8bac78 100644
+--- a/py/mkrules.cmake
++++ b/py/mkrules.cmake
+@@ -119,12 +119,16 @@ add_custom_target(
+ 
+ # Generate qstrs
+ 
++# Planter native Windows build: move long argument lists out of cmd.exe.
++file(GENERATE OUTPUT "${MICROPY_GENHDR_DIR}/cppflags.txt" CONTENT "$<JOIN:${MICROPY_CPP_FLAGS},\n>\n")
++file(GENERATE OUTPUT "${MICROPY_GENHDR_DIR}/qstrsources.txt" CONTENT "$<JOIN:${MICROPY_SOURCE_QSTR},\n>\n")
++
+ # If any of the dependencies in this rule change then the C-preprocessor step must be run.
+ # It only needs to be passed the list of MICROPY_SOURCE_QSTR files that have changed since
+ # it was last run, but it looks like it's not possible to specify that with cmake.
+ add_custom_command(
+     OUTPUT ${MICROPY_QSTRDEFS_LAST}
+-    COMMAND ${Python3_EXECUTABLE} ${MICROPY_PY_DIR}/makeqstrdefs.py pp ${CMAKE_C_COMPILER} -E output ${MICROPY_GENHDR_DIR}/qstr.i.last cflags ${MICROPY_CPP_FLAGS} -DNO_QSTR cxxflags ${MICROPY_CPP_FLAGS} -DNO_QSTR sources ${MICROPY_SOURCE_QSTR}
++    COMMAND ${Python3_EXECUTABLE} ${MICROPY_PY_DIR}/portable_qstr.py pp ${CMAKE_C_COMPILER} ${MICROPY_GENHDR_DIR}/cppflags.txt ${MICROPY_QSTRDEFS_LAST} ${MICROPY_GENHDR_DIR}/qstrsources.txt
+     DEPENDS ${MICROPY_MPVERSION}
+         ${MICROPY_SOURCE_QSTR}
+     VERBATIM
+@@ -134,7 +138,7 @@ add_custom_command(
+ add_custom_command(
+     OUTPUT ${MICROPY_QSTRDEFS_SPLIT}
+     COMMAND ${Python3_EXECUTABLE} ${MICROPY_PY_DIR}/makeqstrdefs.py split qstr ${MICROPY_GENHDR_DIR}/qstr.i.last ${MICROPY_GENHDR_DIR}/qstr _
+-    COMMAND touch ${MICROPY_QSTRDEFS_SPLIT}
++    COMMAND ${CMAKE_COMMAND} -E touch ${MICROPY_QSTRDEFS_SPLIT}
+     DEPENDS ${MICROPY_QSTRDEFS_LAST}
+     VERBATIM
+     COMMAND_EXPAND_LISTS
+@@ -151,7 +155,7 @@ add_custom_command(
+ 
+ add_custom_command(
+     OUTPUT ${MICROPY_QSTRDEFS_PREPROCESSED}
+-    COMMAND cat ${MICROPY_QSTRDEFS_PY} ${MICROPY_QSTRDEFS_PORT} ${MICROPY_QSTRDEFS_COLLECTED} | sed "s/^Q(.*)/\"&\"/" | ${CMAKE_C_COMPILER} -E ${MICROPY_CPP_FLAGS} - | sed "s/^\\\"\\(Q(.*)\\)\\\"/\\1/" > ${MICROPY_QSTRDEFS_PREPROCESSED}
++    COMMAND ${Python3_EXECUTABLE} ${MICROPY_PY_DIR}/portable_qstr.py qdefs ${CMAKE_C_COMPILER} ${MICROPY_GENHDR_DIR}/cppflags.txt ${MICROPY_QSTRDEFS_PREPROCESSED} ${MICROPY_QSTRDEFS_PY} ${MICROPY_QSTRDEFS_PORT} ${MICROPY_QSTRDEFS_COLLECTED}
+     DEPENDS ${MICROPY_QSTRDEFS_PY}
+         ${MICROPY_QSTRDEFS_PORT}
+         ${MICROPY_QSTRDEFS_COLLECTED}
+@@ -172,7 +176,7 @@ add_custom_command(
+ add_custom_command(
+     OUTPUT ${MICROPY_MODULEDEFS_SPLIT}
+     COMMAND ${Python3_EXECUTABLE} ${MICROPY_PY_DIR}/makeqstrdefs.py split module ${MICROPY_GENHDR_DIR}/qstr.i.last ${MICROPY_GENHDR_DIR}/module _
+-    COMMAND touch ${MICROPY_MODULEDEFS_SPLIT}
++    COMMAND ${CMAKE_COMMAND} -E touch ${MICROPY_MODULEDEFS_SPLIT}
+     DEPENDS ${MICROPY_QSTRDEFS_LAST}
+     VERBATIM
+     COMMAND_EXPAND_LISTS
+@@ -198,7 +202,7 @@ add_custom_command(
+ add_custom_command(
+     OUTPUT ${MICROPY_ROOT_POINTERS_SPLIT}
+     COMMAND ${Python3_EXECUTABLE} ${MICROPY_PY_DIR}/makeqstrdefs.py split root_pointer ${MICROPY_GENHDR_DIR}/qstr.i.last ${MICROPY_GENHDR_DIR}/root_pointer _
+-    COMMAND touch ${MICROPY_ROOT_POINTERS_SPLIT}
++    COMMAND ${CMAKE_COMMAND} -E touch ${MICROPY_ROOT_POINTERS_SPLIT}
+     DEPENDS ${MICROPY_QSTRDEFS_LAST}
+     VERBATIM
+     COMMAND_EXPAND_LISTS
+@@ -224,7 +228,7 @@ add_custom_command(
+ add_custom_command(
+     OUTPUT ${MICROPY_COMPRESSED_SPLIT}
+     COMMAND ${Python3_EXECUTABLE} ${MICROPY_PY_DIR}/makeqstrdefs.py split compress ${MICROPY_QSTRDEFS_LAST} ${MICROPY_GENHDR_DIR}/compress _
+-    COMMAND touch ${MICROPY_COMPRESSED_SPLIT}
++    COMMAND ${CMAKE_COMMAND} -E touch ${MICROPY_COMPRESSED_SPLIT}
+     DEPENDS ${MICROPY_QSTRDEFS_LAST}
+     VERBATIM
+     COMMAND_EXPAND_LISTS

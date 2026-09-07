@@ -1,0 +1,2 @@
+mpy-cross==1.28.0.post2
+mpremote==1.29.0

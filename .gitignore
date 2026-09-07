@@ -1,0 +1,17 @@
+.reference/
+reference.zip
+.tools/
+src/config.py
+build/config.py
+**/__pycache__/
+*.pyc
+settings.json*
+wifi.json*
+watering_state.json*
+history*.jsonl
+events.log*
+.ota*
+test-results/
+release/
+soak.csv
+_rom_state.json*

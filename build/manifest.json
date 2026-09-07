@@ -1,0 +1,132 @@
+{
+  "version": "2.0.0-rebuild.2",
+  "mpy": "6.3",
+  "files": [
+    {
+      "name": "ads1x15.mpy",
+      "path": "build/ads1x15.mpy",
+      "size": 443,
+      "sha256": "58a7209b6732ca201c55de08a62ea963534dce18e0da49c7c863fdd9893f0308"
+    },
+    {
+      "name": "api.mpy",
+      "path": "build/api.mpy",
+      "size": 4513,
+      "sha256": "16d7ee8df3cc486c667c70264048216a9707d34f984cfdd2a7d67b93a8b6c230"
+    },
+    {
+      "name": "application.mpy",
+      "path": "build/application.mpy",
+      "size": 6218,
+      "sha256": "740ec054dc6d24054e56e64a953b02460f0daee2d81ad647b57e57e4aabed714"
+    },
+    {
+      "name": "compat.mpy",
+      "path": "build/compat.mpy",
+      "size": 338,
+      "sha256": "9d0cd83cfd39617d681c11fc1a34a2a36c13d0d351362832fc982af9a58490ba"
+    },
+    {
+      "name": "controller.mpy",
+      "path": "build/controller.mpy",
+      "size": 4667,
+      "sha256": "d87e67ebc2488f7aebf66ae9f80f696c11ecc46f3e5296923e1881000130d5dd"
+    },
+    {
+      "name": "env_sensors.mpy",
+      "path": "build/env_sensors.mpy",
+      "size": 2136,
+      "sha256": "d25adb1ccf5499616af1118f2043945ac97722c32b9b0df76c47ce95c2afac19"
+    },
+    {
+      "name": "main.py",
+      "path": "build/main.py",
+      "size": 1269,
+      "sha256": "b58b9df6e264ed93e8f8af372cfe091a101909a3cdd5dcda164fcef17638baee"
+    },
+    {
+      "name": "moisture.mpy",
+      "path": "build/moisture.mpy",
+      "size": 3392,
+      "sha256": "ea87bfed301eb61fec673696e669f4945e534625fde3a3bfc76bad9f32923ad6"
+    },
+    {
+      "name": "persistence.mpy",
+      "path": "build/persistence.mpy",
+      "size": 543,
+      "sha256": "ed3aaf8bda4e8f937c6d9eb80adf24c066e928548736a7b97c5f5c4b33e302ad"
+    },
+    {
+      "name": "runtime.mpy",
+      "path": "build/runtime.mpy",
+      "size": 4771,
+      "sha256": "c295a9ec2f84ca4b561a1bddc08010aabcc5af2013b464b948c54afc77a19a52"
+    },
+    {
+      "name": "settings_store.mpy",
+      "path": "build/settings_store.mpy",
+      "size": 7115,
+      "sha256": "139f0a3bef50e327edf045abbb12ca0d1211c8f4b04bfc3e0be0c4bba15c2dc2"
+    },
+    {
+      "name": "state.mpy",
+      "path": "build/state.mpy",
+      "size": 2543,
+      "sha256": "d61adfda46c77e69fdb73a40d6680a48beb8f90a2b9e4cbf1d40c9d54b2aaa63"
+    },
+    {
+      "name": "status_led.mpy",
+      "path": "build/status_led.mpy",
+      "size": 710,
+      "sha256": "3700dd3e721f64d582d2d920de892b31a61049ac07cbabbaaa8f9733a68f0509"
+    },
+    {
+      "name": "updater.mpy",
+      "path": "build/updater.mpy",
+      "size": 10148,
+      "sha256": "9c18b34b98648733a0bb4055b842a1ae78a3ecba43bf51970457277e94109974"
+    },
+    {
+      "name": "valve.mpy",
+      "path": "build/valve.mpy",
+      "size": 571,
+      "sha256": "ecfbe1bc4194e0028d54e63f9a7090e639426791dc8614bbbe072c15fa6dd524"
+    },
+    {
+      "name": "web.mpy",
+      "path": "build/web.mpy",
+      "size": 10564,
+      "sha256": "442bacebe174054d88131a093c7cebab0d35c2ddd9fa87df7f4a00cac9b87652"
+    },
+    {
+      "name": "wifi.mpy",
+      "path": "build/wifi.mpy",
+      "size": 8057,
+      "sha256": "b3be9203979bbd4507553e5fd3c85178015afda50110e55325dbf667262b639a"
+    },
+    {
+      "name": "wifi_setup.mpy",
+      "path": "build/wifi_setup.mpy",
+      "size": 1420,
+      "sha256": "af539426da03dc81bf14cffa14de6d7df33535ae7712b7cd21caff795f0936f4"
+    },
+    {
+      "name": "index.html",
+      "path": "build/index.html",
+      "size": 56421,
+      "sha256": "ce7a6356f09688da3382f65550e2a666c032704d669e51503b843ccafd08eb19"
+    },
+    {
+      "name": "index.html.gz",
+      "path": "build/index.html.gz",
+      "size": 17748,
+      "sha256": "3dd6a35fef640ba399c0177cc6a303a83acfa78d9228f679a5daafda72d4ee81"
+    },
+    {
+      "name": "version.json",
+      "path": "build/version.json",
+      "size": 32,
+      "sha256": "458d0a41aa5da05d917e829c4672d4c9ff0766d0b387ae52417a8b41cf55d81c"
+    }
+  ]
+}

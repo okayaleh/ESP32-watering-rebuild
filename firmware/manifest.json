@@ -1,0 +1,43 @@
+{
+  "target": "ESP32 classic, 4 MB flash, no PSRAM required",
+  "micropython": "1.28.0",
+  "esp_idf": "5.5.1",
+  "sources": {
+    "micropython": {
+      "revision": "e0e9fbb17ed6fd06bb76e266ae554784c9c80804",
+      "url": "https://github.com/micropython/micropython"
+    },
+    "esp-idf": {
+      "revision": "fcae32885b0296b32044cb99ecbdc50d98dddb83",
+      "url": "https://github.com/espressif/esp-idf"
+    }
+  },
+  "artifacts": [
+    {
+      "file": "planter-esp32-1.28.0-romfs.bin",
+      "bytes": 1463952,
+      "flash_offset": "0x1000",
+      "sha256": "77c731f506c3bf13404373c094dad681981d226567021f69e87a5d05182a2722"
+    },
+    {
+      "file": "planter-esp32-1.28.0-romfs.app-bin",
+      "bytes": 1402512,
+      "flash_offset": "0x10000",
+      "sha256": "9369e9e2eba45a9828d3d8c929c2b39ddeb41987318d8aa092aa130908780073"
+    }
+  ],
+  "patches": [
+    "tools/firmware/micropython.patch",
+    "tools/firmware/prepare_firmware.py",
+    "tools/firmware/prepare_windows.py",
+    "tools/firmware/portable_qstr.py"
+  ],
+  "features": {
+    "romfs_banks": 2,
+    "romfs_bank_bytes": 262144,
+    "filesystem_bytes": 1572864,
+    "gc_split_native_margin_bytes": 32832,
+    "bluetooth": false,
+    "ethernet_lan": false
+  }
+}
