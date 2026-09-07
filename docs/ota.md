@@ -104,6 +104,11 @@ UPDATE_MANIFEST_PATH = "build/manifest.json"
 UPDATE_AUTO_INSTALL = False
 ```
 
+For an already-installed controller, edit its on-board `config.py` over USB
+with valve power disconnected, save the file and reboot. The updater reads
+these options at startup; changing a laptop copy or saving without a reboot
+does not change the running updater's address.
+
 Allow the mirror port through the computer's firewall for the private LAN.
 Keep the computer and mirror running until installation completes. A hostname
 also works through the controller's asynchronous DNS resolver. The URL must

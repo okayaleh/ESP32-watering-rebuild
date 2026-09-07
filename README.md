@@ -1,27 +1,132 @@
-# Garden watering controller — rebuild
+# ESP32 garden watering controller
 
-A new MicroPython implementation of [supercrossed/ESP32-watering](https://github.com/supercrossed/ESP32-watering), built from its [rebuild specification](https://github.com/supercrossed/ESP32-watering/blob/main/docs/REBUILD-PROMPT.md), overview, API documentation and source. It controls normally closed solenoid valves from moisture readings and daily schedules, with an embedded dashboard and no cloud dependency for watering.
+A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.com/supercrossed/ESP32-watering), based on its [rebuild specification](https://github.com/supercrossed/ESP32-watering/blob/main/docs/REBUILD-PROMPT.md), overview, API documentation and source. The ESP32 controls normally closed solenoid valves using soil moisture readings, daily schedules and manual commands. A phone-friendly dashboard runs on the controller; watering has no cloud-service dependency.
 
-**Status:** installed and bench validated on a classic ESP32-D0WD-V3 with 4 MB flash. Validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog recovery, and production startup. The supplied custom platform image keeps application code in flash and reserves native networking memory. The connected board has automatic watering disabled. It has joined the user's home Wi-Fi, synchronized its clock, and completed a short LAN check with 34 successful HTTP responses and no failed requests. Router outage recovery, sensors, valves, and a 48–72-hour network soak remain to be commissioned; see the [validation report](docs/validation.md) and [commissioning checklist](docs/commissioning.md) before unattended watering.
+**Start here:** [Getting started](docs/getting-started.md) · [All documentation](docs/README.md) · [Download releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases) · [Updates and rollback](docs/ota.md)
 
-## What is included
+## Project status
 
-- Up to 8 valves, 16 zones, 4 ADS1115 boards and 20 daily schedules. One valve runs at a time, including manual and scheduled batches.
-- Per-zone dry thresholds, wet targets, durations, calibration and mappings to multiple valves; bounded soak/recheck sessions and per-valve cooldowns.
-- Valve closure at boot, monotonic run deadlines, startup grace, hardware watchdog, and durable watering intent/cooldowns. Scheduled occurrences are recorded before their valves can open, preventing duplicate runs after resets or backward clock changes.
-- Nonblocking HTTP, DNS, NTP and OTA transfers. Two browser clients maximum, 512-byte socket writes, partial-write handling, bounded requests and absolute deadlines.
-- WiFi retry/backoff, captive setup and rescue hotspot, gateway health probes, and observable listener faults. Networking faults are isolated from watering decisions.
-- A self-contained phone-friendly dashboard: valve/zone controls, history charts, schedules, settings, GPIO map, sensors, calibration, WiFi, environment/weather, diagnostics, event log, import/export, uploads and updates.
-- Transactional OTA staging, SHA-256 verification, boot trials and rollback. An immutable boot guard preserves recovery across interrupted installations.
-- Versioned release archives retain the current update and at least two previous updates as releases accumulate. The update helper lists the newest three available releases; any retained compatible tag can be selected for manual rollback. Release history is not automatically pruned.
+The current application is **2.0.0-rebuild.2**, published as a **prerelease** and installed on a classic ESP32-D0WD-V3 with 4 MB flash. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
-The [feature checklist](docs/feature-parity.md) records implementation locations, deliberate changes and inherited groundwork. Flow-volume settings and the rain display are present; flow pulse counting and rain-based watering suppression were not implemented in the original and remain groundwork here.
+Validation includes **190 host tests**, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. The bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**.
 
-Versioned downloads are published under [GitHub Releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases). See [update and rollback instructions](docs/ota.md) to list the newest release and two previous choices, then select a tested compatible version.
+The installed bench board has both automatic watering modes disabled. **Fresh application defaults enable daily and moisture watering. Keep valve supply power disconnected during setup, then disable or review both modes in Settings before commissioning.** Router outage recovery, DHCP renewal, actual sensors and valves, and a 48–72-hour network soak remain to be validated. Read the [validation report](docs/validation.md) for measured results and limits, and complete the [commissioning checklist](docs/commissioning.md) before unattended watering.
 
-## Build
+## Features
 
-Use Python 3.10+ and Node.js 22+. On this Windows workspace, the installed Thonny Python and local compiler/Node are already available:
+| Area | Included behavior |
+| --- | --- |
+| Watering | Up to 8 valves, 16 zones and 20 daily schedules; one valve runs at a time, including manual, zone and all-valve batches |
+| Moisture control | Per-zone calibration, dry threshold, wet target, duration and valve mappings; bounded soak/recheck cycles and per-valve cooldowns |
+| Output supervision | Closure at boot, monotonic deadlines, hard maximum run duration, startup grace, hardware watchdog and persistent watering intent |
+| Schedule persistence | Occurrences recorded before activation to prevent duplicate starts after resets or backward clock changes |
+| Sensors | Up to 4 ADS1115 boards on one I2C bus; optional AHT20, BMP280 and digital rain indication; bounded reads and bus recovery |
+| Dashboard | Live status, manual controls, charts, schedules, settings, calibration, GPIO map, environment/weather, Wi-Fi, event log and diagnostics |
+| Networking | Bounded nonblocking HTTP, DNS, NTP and update transfers; Wi-Fi retry/backoff, setup/rescue hotspot and gateway health checks |
+| Configuration | Validated settings, rename propagation, import/export, separate credentials and migration support for the original project |
+| Updates | Hashed manifests, staged uploads, transactional installation, failed-boot recovery and selectable archived releases |
+| Development | Precompiled application build, local simulator, fault tests, GitHub validation and tag-driven releases |
+
+Flow-meter pin and volume fields are preserved as configuration groundwork, but watering is **timed**: flow pulse counting is not implemented. Rain is **display-only** and does not suppress watering. These functions were also groundwork in the original. The [feature checklist](docs/feature-parity.md) maps the original functions to the rebuild and documents deliberate behavior changes.
+
+## Documentation
+
+The repository's **[Documents section](docs/README.md)** is the entry point for user guides and technical references.
+
+| Document | What it covers |
+| --- | --- |
+| [Getting started](docs/getting-started.md) | Download, first USB installation, home Wi-Fi setup and initial configuration |
+| [Hardware and wiring](docs/hardware.md) | Valve drivers, flyback protection, pin assignments, ADC addressing and board profiles |
+| [Troubleshooting](docs/troubleshooting.md) | Hotspot passwords, Google mesh, connection diagnostics, startup and recovery |
+| [Commissioning](docs/commissioning.md) | Physical checks and network soak required before unattended watering |
+| [Updates and rollback](docs/ota.md) | Publish releases, retain earlier updates, run the laptop mirror and recover |
+| [HTTP API](docs/api.md) | Routes, request formats, limits, errors and control behavior |
+| [Architecture](docs/architecture.md) | Control loop, persistence, networking, memory and failure handling |
+| [Feature checklist](docs/feature-parity.md) | Comparison with the original project and remaining groundwork |
+| [Validation report](docs/validation.md) | Host and board measurements, tested conditions and outstanding checks |
+| [Platform firmware](firmware/README.md) | Native images, flash addresses, partition layout and ROM cache |
+| [Rebuild the platform](tools/firmware/README.md) | Pinned upstream sources, toolchain and Windows reproduction instructions |
+
+## Hardware requirements
+
+The supplied platform image targets a **classic 4 MB ESP32**, such as an ESP32-WROOM-32 development board. It is **not an ESP32-S3 image**. The application includes a separate ESP32-S3-WROOM-1 N16R8 pin profile; that board requires its own compatible firmware and pin configuration, and has not received the same physical validation.
+
+For the intended garden installation, use normally closed 12 V solenoid valves, a suitable 3.3 V-controlled driver per valve, flyback diodes, an adequately rated valve supply and regulated ESP32 power. Capacitive probes connect through ADS1115 inputs. Driver wiring must keep valves closed while the ESP32 resets or loses power; the [hardware guide](docs/hardware.md) explains active-high and active-low requirements.
+
+| Classic ESP32 default | Connection |
+| --- | --- |
+| First valve | GPIO26, active-high |
+| I2C SDA / SCL | GPIO21 / GPIO22 |
+| First ADS1115 | Address `0x48` |
+| First moisture probe | ADS1115 A0, global channel 0 |
+| Plain status LED | GPIO2 |
+
+No valve supply or sensors are required to explore the dashboard on a bench board. Sensor errors are expected when those devices are absent.
+
+## Quick start
+
+1. Download and extract `planter-<version>.zip` from [Releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases). Use the packaged ZIP asset for prebuilt application files and the custom platform image.
+2. For a new installation, back up the existing device and follow the [USB installation guide](docs/getting-started.md#install-on-a-classic-4-mb-esp32). The original project's OTA updater cannot migrate to this rebuild.
+3. With valve power disconnected, start the ESP32. Join its open **`Planter-Setup-xxxx`** Wi-Fi network and visit **http://192.168.4.1/setup** if the setup page does not open automatically.
+4. Enter your **home Wi-Fi name and home Wi-Fi password**. The password field does not create a password for the Planter hotspot. On Google mesh, use your normal shared network name; you do not need to choose or separate the 2.4 GHz and 5 GHz names. See [Wi-Fi troubleshooting](docs/troubleshooting.md).
+5. Rejoin home Wi-Fi and open the controller's assigned IP address, shown on serial or in the router's device list. Review watering modes, hardware, calibration, timezone and schedules before enabling physical watering.
+
+The hostname is `planter`; automatic `planter.local` resolution depends on firmware and the LAN. Use the numeric IP when hostname resolution is unavailable. The device has a 60-second startup grace period by default, which also blocks manual opens. Local schedule time uses an editable fixed UTC offset; daylight saving changes are manual, and schedules wait for successful time synchronization after boot.
+
+## Normal operation and configuration
+
+Use the dashboard to map each soil zone to its ADC channel and valves, calibrate dry/wet readings, then set its dry threshold, wet target and run duration. Configure daily schedules separately. Manual zone or all-valve actions run mapped valves sequentially; **Stop all** cancels pending runs and moisture recheck cycles. Saving settings can stop and cancel queued watering, and hardware/pin changes require a reboot.
+
+| Location | Purpose | Updated by application OTA? |
+| --- | --- | --- |
+| `settings.json` on the board | Authoritative saved zones, valves, schedules and runtime settings | No |
+| `wifi.json` on the board | Saved home Wi-Fi credentials; takes precedence over config defaults | No |
+| `watering_state.json` on the board | Watering intent, schedule occurrences and cooldowns | No |
+| `config.py` on the board | First-boot defaults and local options such as board type, watchdog, hard cutoff and update mirror | No |
+| `boot.py` and `romboot.py` | Recovery and ROM cache boot helpers | No; USB maintenance only |
+| Manifest-listed application files | Compiled modules, entrypoint, dashboard and version | Yes |
+
+After first boot, editing a default zone in `config.py` does not replace saved runtime settings. Export settings from the dashboard before substantial changes; that export excludes Wi-Fi credentials. Keep private device backups outside the public repository. The dashboard and API are unauthenticated and intended for a trusted local network; do not expose them through router port forwarding.
+
+## Updates and the previous two versions
+
+[GitHub Releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases) retain the **current update and at least two previous updates** as releases accumulate. Older releases and local download caches are kept too; there is no automatic pruning. Published release tags and assets are protected by GitHub release immutability. The first published application is `v2.0.0-rebuild.2`; earlier recovery choices appear as actual subsequent versions are released.
+
+List the newest three available choices from an extracted package or repository checkout:
+
+```powershell
+python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --list
+```
+
+Download a specific release, verify its archive and application hashes, and serve it from the laptop:
+
+```powershell
+$releaseRoot = python tools/sync_updates.py --repo okayaleh/ESP32-watering-rebuild --tag v2.0.0-rebuild.2
+if ($LASTEXITCODE -ne 0) { throw "Release verification failed" }
+python tools/mirror.py --directory "$releaseRoot" --port 8000
+```
+
+Set `UPDATE_BASE_URL` in the board's local `config.py` to the laptop's trusted LAN HTTP address, for example `http://192.168.1.50:8000`. For an installed controller, save that file over USB with valve power disconnected and reboot to load the new address. Then use **Check for update** in the dashboard, review the displayed version and apply while watering is idle. The base URL is blank by default, so the mirror must be configured before this works. Keep the laptop and mirror running through installation; direct GitHub HTTPS URLs are not supported by the board updater.
+
+To revert, select a retained older tag that worked on your controller and use the same process. Check that its application is compatible with the saved settings and native firmware. Repository archives provide multiple selectable versions; the board's transaction recovery keeps one previous set of changed files, not two complete permanent installations. A successful boot trial measures safety-loop startup, not long-term field reliability. Follow the [complete update and recovery guide](docs/ota.md) for compatibility limits and interrupted-update behavior.
+
+## Build and validate
+
+Use Python 3.10+ and Node.js 22+. From a new checkout:
+
+```text
+git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
+cd ESP32-watering-rebuild
+python -m pip install -r requirements-dev.txt
+python tools/build.py --version 2.0.0-rebuild.2
+python tools/check.py
+```
+
+The build pins `mpy-cross` to MicroPython 1.28.0 and emits portable `.mpy` v6.3 files. If `src/config.py` does not exist, the blank-credential `src/config.example.py` supplies defaults. To customize local board options, copy the example to `src/config.py` before building. The build copies local configuration to the ignored `build/config.py`; it scrubs the public example and rejects credentials that remain elsewhere in that example.
+
+`tools/check.py` compiles Python source, checks dashboard JavaScript syntax and runs the host test suite. Physical testing remains a separate commissioning step. `python tools/package.py` verifies application and platform hashes and writes a release ZIP plus SHA-256 file under `release/`, including a scrubbed default config.
+
+On this project's Windows development laptop, Thonny Python can be selected explicitly:
 
 ```powershell
 $python = "$env:LOCALAPPDATA/Programs/Thonny/python.exe"
@@ -29,42 +134,38 @@ $python = "$env:LOCALAPPDATA/Programs/Thonny/python.exe"
 & $python tools/check.py
 ```
 
-On another computer:
+The supplied `build_mpy.ps1` and `serve_updates.ps1` also detect that Python installation. Building application files does not rebuild the native MicroPython runtime; follow the [platform build recipe](tools/firmware/README.md) when that is required.
+
+## Preview without an ESP32
 
 ```text
-python -m pip install -r requirements-dev.txt
-python tools/build.py
-python tools/check.py
+python tools/simulate.py
 ```
 
-The compiler is pinned to MicroPython 1.28.0, emitting portable `.mpy` v6.3 with optimization enabled. `build/` contains the application filesystem bundle: `main.py`, immutable `boot.py` and `romboot.py`, local `config.py`, precompiled modules, dashboard files, and a hashed manifest. The separate [platform firmware](firmware/README.md) contains the flashable Espressif `.bin`, source patches and reproduction instructions. `config.py` is excluded from Git and OTA; the example has blank WiFi credentials. The build refuses failed credential scrubbing.
+Open **http://127.0.0.1:8080**. The simulator uses the real controller, API and HTTP transport with fake GPIO and moisture readings, and displays a simulation banner. Its private data stays in `.tools/simulation/`. It cannot validate the ESP32 radio, GPIO, watchdog or I2C hardware.
 
-## Configure and install
+With the simulator still running, the optional dashboard integration audit is `node tests/test_dashboard.cjs`. Stop the simulator with Ctrl+C.
 
-1. Export settings and back up files from the original controller. Initial migration to this rebuild is through USB, not the original OTA mechanism.
-2. Follow [hardware and board configuration](docs/hardware.md). If customizing defaults, copy `src/config.example.py` to `src/config.py` and edit it before building. WROOM-32 defaults must be changed for an S3.
-3. For the classic 4 MB ESP32, use the supplied [Planter platform firmware](firmware/README.md). Stock ESP32_GENERIC 1.28 exhausted native networking memory with this complete application. The custom image is **not for ESP32-S3**; S3 boards need their correct PSRAM firmware and pin configuration. Disconnect valve supply power during installation.
-4. On a fresh filesystem, copy the contents of `build/` into `/` using Thonny, including both USB boot helpers. Copy `main.py` last. `manifest.json` is not required on the device. On the custom platform, boot verifies the files and builds a ROM cache; the filesystem copies remain authoritative for updates. Remove older `.py` siblings when installing `.mpy` files.
-5. Reboot. With no credentials, join `Planter-Setup-xxxx` and open `http://192.168.4.1/setup`; enter the SSID and password. Once connected, use the IP printed on serial/the router's lease list. The hostname is `planter`; `.local` resolution depends on firmware and the LAN.
-6. Configure zones and pins, or import the exported settings. Existing `wifi.json` takes precedence; settings and watering-state migrations also support the old project. Fixed timezone offset is editable; DST changes are manual.
-7. Complete commissioning with water disconnected first, then verify actual flow and closure under supervision.
+## Repository layout
 
-Settings become authoritative in `settings.json` after first boot. Editing a first-boot zone in `config.py` does not overwrite runtime settings. OTA connection options, board type, watchdog and hard cutoff remain local config parameters.
+| Path | Contents |
+| --- | --- |
+| [`src/`](src/) | MicroPython application, local-config example and dashboard source |
+| [`build/`](build/) | Generated application files, boot helpers and hashed OTA manifest |
+| [`docs/`](docs/README.md) | User guides, design references and validation records |
+| [`firmware/`](firmware/README.md) | Classic ESP32 platform images, provenance, partition table and third-party licenses |
+| [`tools/`](tools/) | Build, package, release download, mirror, simulator and runtime reproduction tools |
+| [`tests/`](tests/) | Host fault tests and dashboard integration audit |
+| [`.github/workflows/`](.github/workflows/) | Push/PR validation and version-tag release publication |
 
-## Preview without hardware
+Local tools, credentials, device backups, logs and test output are ignored by Git. The original project is kept in the development workspace under the ignored `.reference/` directory for comparison; it is not included in release packages.
 
-```powershell
-& $python tools/simulate.py
-```
+## Contributing and publishing
 
-Open `http://127.0.0.1:8080`. The simulator uses the actual controller, API and HTTP transport with fake pins and moisture readings; a banner identifies it. Its data stays in `.tools/simulation/`. It cannot validate radio, GPIO, watchdog or I2C behavior.
+Report reproducible problems in [Issues](https://github.com/okayaleh/ESP32-watering-rebuild/issues), including the application version, exact board, relevant event messages and steps to reproduce. Remove passwords and private network details from shared logs.
 
-With the simulator running, the dashboard integration audit is:
+For changes, run the build and host checks, update the relevant documents and record any physical validation. GitHub also validates pushes and pull requests. A maintainer publishes an update by pushing a new `v<version>` tag; the release workflow builds, checks and packages that tag, then publishes immutable assets. Versions containing a hyphen are prereleases. Never reuse a published tag; see the [release procedure](docs/ota.md#publish-and-select-a-github-release).
 
-```powershell
-& ./.tools/node.exe tests/test_dashboard.cjs
-```
+## License and attribution
 
-Use `node tests/test_dashboard.cjs` on another computer. Stop the simulator with Ctrl+C. [OTA setup](docs/ota.md), [API](docs/api.md), [architecture/reliability](docs/architecture.md), and [validation report](docs/validation.md) cover the remaining details.
-
-MIT license. The original project is retained locally under `.reference/` for comparison and is excluded from the deliverable repository.
+MIT licensed; see [LICENSE](LICENSE). The original project and specification are by [supercrossed](https://github.com/supercrossed/ESP32-watering). The custom runtime includes upstream MicroPython, ESP-IDF and other components with their own retained [license notices](firmware/licenses/README.md).
