@@ -45,11 +45,51 @@ its update hold. Afterward it reported 60,880 bytes free Python heap,
 Maximum observed loop duration was 1,782 ms while updates held valves closed.
 This is a brief bench observation, not a watering deadline measurement.
 
-Publication of the immutable .5 channel and a complete download/install/reboot
-from that channel remain the final release acceptance steps at this snapshot.
-Their subsequent results belong in this report. The board has no connected
-watering hardware, and automatic watering remains disabled. Multi-day Wi-Fi
-and real garden commissioning remain outstanding.
+### Published .5 release acceptance
+
+The final .5 release passed **233 host tests on GitHub Actions**, including
+the pinned compression golden fixture. Linux produced exactly the same
+64,145-byte dashboard and 19,443-byte gzip as Windows. The publisher verified
+all 22 OTA artifacts, the manifest and native platform against the tag, then
+verified the immutable published ZIP before advertising the channel.
+The published source commit is `3716873526f54260e31d2d115e938e8983201e3f`.
+The channel manifest SHA-256 is
+`97f8ec2f7085f98521cafd94b1fc8a544ebf192257af515b15b6b7eabf6a582a`.
+
+The bench ESP32 running the .4 candidate was restarted after publication.
+After Wi-Fi, NTP and startup grace, it automatically checked GitHub, downloaded
+the four changed artifacts (`runtime.mpy`, `updater.mpy`, `index.html.gz`,
+`version.json`), installed them transactionally and rebooted into .5. The
+laptop supplied USB power and observed the device; it did not serve any update
+files. The final firmware files were downloaded by the ESP32 over HTTPS.
+Serial capture shows the expected software reboot followed by Wi-Fi and NTP,
+with no traceback or boot recovery failure. Missing-I2C-device messages are
+expected on this sensor-free bench board.
+
+A subsequent COM8 audit verified SHA-256 and size of **all 22 application
+files**, plus both boot helpers, local configuration, settings and Wi-Fi files.
+The on-board journal reported **stable / 2.0.0-rebuild.5**. Updated modules
+loaded from `/rom`; GitHub source, automatic installation, 04:00 check time and
+GPIO2 RGB settings survived. All three configured valve outputs read closed.
+Garden settings and Wi-Fi credentials matched their saved pre-update files.
+Automatic garden watering remains disabled in the existing bench settings.
+Evidence: `github-ota-serial.txt` and `github-final-usb-audit.json`.
+
+The real dashboard then passed manual **Check for updates** acceptance:
+HTTP 200, a newer `last_check`, installed/selected .5, `checked`, no update
+available and no error. That click did not install or reboot. Three zones
+rendered, and dark/light desktop/mobile captures had no JavaScript errors or
+horizontal overflow. One initial browser load timeout did not reproduce; a
+fresh diagnostic load returned all seven startup requests with HTTP 200.
+An intentionally preempted GET during the manual check is not a failed update.
+Evidence: `github-board-ui.json` and four `github-board-ui-*.png` captures.
+
+Post-install LAN observations covered successful startup/automatic checks,
+and later UI acceptance observed more than forty minutes of uninterrupted
+reported uptime. Wi-Fi and time remained healthy with no watering safety
+fault. These observations do not measure worst-case TLS heap usage with full
+history and maximum hardware configuration, or replace multi-day Wi-Fi and
+real garden commissioning. The board has no connected watering hardware.
 
 ## 2.0.0-rebuild.3 — dark mode and RGB status
 

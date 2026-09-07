@@ -42,10 +42,11 @@ retained for USB/mirror recovery. Reverting to either removes direct GitHub
 updating until .5 or later is installed again. More dashboard recovery choices
 appear as actual compatible releases are published.
 
-The [validation report](validation.md) separates host checks from physical
-ESP32 testing. Hardware TLS transfer, update/reboot, memory and network
-acceptance must be recorded before claiming this version was verified on a
-particular board.
+The [validation report](validation.md) records 233 passing host tests and
+physical COM8 acceptance: automatic GitHub download/install/reboot into .5,
+all 22 firmware files verified, a stable boot trial, preserved settings and
+a successful dashboard update check. Garden hardware and multi-day network
+commissioning remain separate.
 
 ## 2.0.0-rebuild.4 — unpublished candidate
 
