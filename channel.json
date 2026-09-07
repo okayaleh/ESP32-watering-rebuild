@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "repository": "okayaleh/ESP32-watering-rebuild",
+  "releases": [
+    {
+      "version": "2.0.0-rebuild.5",
+      "commit": "3716873526f54260e31d2d115e938e8983201e3f",
+      "manifest_sha256": "97f8ec2f7085f98521cafd94b1fc8a544ebf192257af515b15b6b7eabf6a582a",
+      "manifest_size": 4186,
+      "published_at": "2026-09-07T22:25:26Z"
+    }
+  ]
+}
