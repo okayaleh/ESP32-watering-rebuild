@@ -22,6 +22,13 @@ A moisture session starts below its dry threshold, waters its eligible mapped va
 
 The dashboard serializes **all** fetches through one promise queue, including actions and weather requests. A single scheduler staggers periodic work, and errors release the queue. A mutation cancels an active read before joining the queue, so a slow history download does not hold up a stop action. Mutations are never cancelled by later requests. Live-history reads have an 18-second timeout; saved-history reads allow 90 seconds. A browser-side timeout cannot guarantee the board did not receive a watering action, so the UI does not blindly retry mutations.
 
+The compact dashboard groups each zone's moisture dial, raw ADC reading,
+sensor commands and mapped valve controls in one panel. Repeated views of a
+shared valve represent the same controller output; they do not create new
+valves or independent watering queues. Shared settings and maintenance stay
+available in expandable sections. Gauges and themes render in the browser,
+using the existing readings and control APIs.
+
 Listener health distinguishes fatal `accept()` errors from EAGAIN and retries an invalid listener after30s. Last accept/response times, counters and errors are exposed. An idle listener is not labeled “reachable”: end-to-end reachability remains explicitly unverified. The original project reproduced intermittent stalls below the application in MicroPython/lwIP, so listener recreation is not claimed to cure that fault. Establish behavior on the actual firmware/router with the commissioning soak test.
 
 ## Standalone GitHub updates

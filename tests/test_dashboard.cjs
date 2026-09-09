@@ -17,7 +17,10 @@ class Element {
   all(){return [this,...this.children.flatMap(c=>c.all?.()||[])];}
   querySelectorAll(selector){return this.all().filter(e=>e.tagName===selector.toUpperCase());}
   addEventListener(type,fn){(this.listeners[type]||=[]).push(fn);}
-  setAttribute(key,value){this.attributes[key]=value;}
+  setAttribute(key,value){this.attributes[key]=String(value);}
+  getAttribute(key){return this.attributes[key]??null;}
+  removeAttribute(key){delete this.attributes[key];}
+  focus(){document.activeElement=this;}
   reportValidity(){return true;}
   click(){}
   getContext(){
@@ -42,7 +45,7 @@ for(const [options,expected] of [[{},'light'],[{systemDark:true},'dark'],[{store
 const themeEnvironmentLive=themeEnvironment({systemDark:true});
 const ids = new Map([...source.matchAll(/<([a-z]+)[^>]*\bid="([^"]+)"[^>]*>/g)].map(m=>[m[2],new Element(m[1])]));
 const ranges=[0,24,168].map(hours=>{const el=new Element('button');el.dataset.hours=String(hours);return el;});
-const document={...themeEnvironmentLive.document,getElementById:id=>ids.get(id),createElement:tag=>new Element(tag),querySelectorAll:()=>ranges,addEventListener(){},body:new Element('body'),hidden:false};
+const document={...themeEnvironmentLive.document,getElementById:id=>ids.get(id),createElement:tag=>new Element(tag),createElementNS:(namespace,tag)=>new Element(tag),querySelectorAll:()=>ranges,addEventListener(){},body:new Element('body'),hidden:false,activeElement:null};
 let active=0,maximum=0,requests=[],failNext=false,stallNextRead=false,readStarted=null,abortedReads=0;
 const sandbox={document,window:{...themeEnvironmentLive.window,devicePixelRatio:1,addEventListener(){}},localStorage:themeEnvironmentLive.localStorage,getComputedStyle:()=>({getPropertyValue:key=>{const dark=document.documentElement.dataset.theme==='dark';return key==='--chart-line'?(dark?'#3b5143':'#e1e6dc'):(dark?'#a7bbae':'#62736b');}}),navigator:{},console,URL,URLSearchParams,Blob,FormData,AbortController,confirm:()=>true,
  setTimeout:(fn,ms)=>fn.name==='tick'?0:setTimeout(fn,ms).unref(),clearTimeout,
@@ -51,6 +54,102 @@ const sandbox={document,window:{...themeEnvironmentLive.window,devicePixelRatio:
 vm.createContext(sandbox);
 async function run(code){return vm.runInContext(code,sandbox);}
 async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]||[])await fn({preventDefault(){},currentTarget:ids.get(id)});if(ids.get('toast').className.includes('error'))throw Error(ids.get('toast').textContent);}
+async function clickElement(element){assert.ok(element,'Expected a control in its zone panel');for(const fn of element.listeners.click||[])await fn({preventDefault(){},currentTarget:element});if(ids.get('toast').className.includes('error'))throw Error(ids.get('toast').textContent);}
+function buttonWithin(element,label){return element.all().find(child=>child.tagName==='BUTTON'&&child.textContent===label);}
+async function auditCompactZones(){
+  const snapshot=await run('({zones:model.zones,valves:model.valves,status:model.status,settings:model.settings,calibrating:model.calibrating,captureZone:model.captureZone,calibrationData:model.calibrationData})');
+  const firstName='<img src=x onerror=alert(1)> / A & B',secondName='Second bed',sharedValve='Shared & bed/?',spareValve='Unassigned valve';
+  sandbox.panelFixture={zones:[{name:firstName,channel:0,valves:[sharedValve],threshold:30,wet_target:65,water_duration_sec:17},{name:secondName,channel:1,valves:[sharedValve],threshold:40,wet_target:70,water_duration_sec:23},{name:'Sensor only',channel:2,valves:[],threshold:30,wet_target:60,water_duration_sec:12}],valves:[{name:sharedValve,pin:26},{name:spareValve,pin:27}]};
+  await run('globalThis.savedPanelPost=post;globalThis.savedPanelRequest=request;globalThis.savedPanelRefresh=refreshStatus;globalThis.panelActions=[];globalThis.panelCalibrationReads=0;globalThis.panelRefreshes=0;globalThis.panelCalibrationResponse={busy:false,result:null,calibration:{}};post=async(path,body)=>{panelActions.push({path,body});return {ok:true};};request=async(path,...args)=>{if(path==="/api/calibrate"){panelCalibrationReads++;return panelCalibrationResponse;}return savedPanelRequest(path,...args);};refreshStatus=async()=>{panelRefreshes++;renderStatus();return model.status;};model.zones=panelFixture.zones;model.valves=panelFixture.valves;model.settings={...JSON.parse(JSON.stringify(model.settings)),zone_thresholds:{},max_valve_open_sec:600};model.status={wifi_connected:true,time_synced:true,valves:{},moisture:[]};model.calibrating=false;model.captureZone=null;model.calibrationData=null;renderLive();renderStatus();');
+  try{
+    const first=await run('model.zoneNodes.get(panelFixture.zones[0].name)'),second=await run('model.zoneNodes.get(panelFixture.zones[1].name)'),sensorOnly=await run('model.zoneNodes.get("Sensor only")');
+    assert.equal(first.gauge.getAttribute('role'),'img');
+    assert.match(first.gauge.getAttribute('aria-label'),/unavailable|no reading/i);
+    for(const attribute of ['aria-valuemin','aria-valuemax','aria-valuenow','aria-valuetext'])assert.equal(first.gauge.getAttribute(attribute),null);
+    assert.ok(first.gauge.all().includes(first.raw),'Raw ADC belongs inside the gauge SVG');
+    assert.match(first.card.textContent,/<img src=x onerror=alert\(1\)> \/ A & B/);
+    assert.equal(first.card.all().some(element=>element.tagName==='IMG'),false,'User names must remain literal text');
+    assert.equal(first.seconds.value,'17');assert.equal(second.seconds.value,'23');
+    const setReading=async(percent,raw)=>{sandbox.panelReading={name:firstName,percent,raw,error:null};await run('model.status.moisture=[panelReading];renderStatus();');};
+    // Invalid or absent percentages cannot masquerade as a dry 0% reading.
+    for(const invalid of [undefined,null,'',false,'25','bad',NaN,Infinity]){
+      await setReading(invalid,0);
+      assert.equal(first.value.textContent,'—',String(invalid)+' must be unavailable');
+      assert.equal(first.gauge.getAttribute('role'),'img');
+      for(const attribute of ['aria-valuemin','aria-valuemax','aria-valuenow','aria-valuetext'])assert.equal(first.gauge.getAttribute(attribute),null,'Unavailable readings must not expose a numeric meter');
+      assert.match(first.gauge.getAttribute('aria-label'),/unavailable|no reading/i);
+      assert.match(first.gauge.getAttribute('aria-label'),/raw.*\b0\b/i);
+      assert.equal(first.raw.textContent.replace(/[^0-9]/g,''),'0','A real raw zero is independent of percentage availability');
+    }
+    for(const [percent,clamped] of [[-19,0],[0,0],[42.5,42.5],[100,100],[143,100]]){
+      await setReading(percent,32767);
+      assert.equal(first.gauge.getAttribute('role'),'meter');
+      assert.equal(first.gauge.getAttribute('aria-valuemin'),'0');assert.equal(first.gauge.getAttribute('aria-valuemax'),'100');
+      assert.equal(first.gauge.getAttribute('aria-valuenow'),String(clamped));
+      assert.equal(first.value.textContent,clamped+'%');
+      assert.equal(first.raw.textContent.replace(/[^0-9]/g,''),'32767');
+    }
+    for(const invalid of [null,undefined,'',false,'0',NaN]){
+      await setReading(50,invalid);
+      assert.equal(first.raw.textContent.includes('0'),false,'Unavailable raw ADC must not be shown as zero');
+      assert.match(first.raw.textContent,/—|unavailable/i);
+    }
+    // Polling changes readings and all copies of a shared valve, preserving an
+    // in-progress edit and keyboard focus on that zone's duration field.
+    first.seconds.value='47';first.seconds.focus();
+    await run('model.status.valves[panelFixture.valves[0].name]={open:true,seconds_open:3,last_close_reason:"manual"};renderStatus();');
+    assert.equal((await run('model.zoneNodes.get(panelFixture.zones[0].name)')).seconds,first.seconds);
+    assert.equal(first.seconds.value,'47');assert.equal(document.activeElement,first.seconds);
+    const sharedViews=await run('model.valveNodes.get(panelFixture.valves[0].name)');
+    assert.ok(sharedViews.length>=3,'Both assigned zone panels and the all-valve tools must remain available');
+    for(const refs of sharedViews){assert.match(refs.state.textContent,/Watering.*3s/);assert.match(refs.detail.textContent,/GPIO 26/);}
+    assert.match(first.card.textContent,/Watering.*3s/);assert.match(second.card.textContent,/Watering.*3s/);
+    await run('model.status.valves[panelFixture.valves[0].name].open=false;renderStatus();');
+    for(const refs of sharedViews)assert.match(refs.state.textContent,/Closed/);
+    assert.match(ids.get('valves-live').textContent,/Unassigned valve/);
+    assert.ok((await run('model.valveNodes.get(panelFixture.valves[1].name)')).length>=1);
+    assert.equal(buttonWithin(sensorOnly.card,'Water zone').disabled,true,'An unassigned zone must not pretend to queue water');
+    await clickElement(buttonWithin(first.card,'Water zone'));
+    let action=await run('panelActions.at(-1)'),url=new URL(action.path,'http://controller');
+    assert.equal(url.pathname,'/api/zone/trigger');assert.equal(url.searchParams.get('zone'),firstName);assert.equal(url.searchParams.get('duration'),'47');
+    await clickElement(buttonWithin(first.card,'Water'));
+    action=await run('panelActions.at(-1)');url=new URL(action.path,'http://controller');
+    assert.equal(url.pathname,'/api/water/trigger');assert.equal(url.searchParams.get('valve'),sharedValve);assert.equal(url.searchParams.get('duration'),'47');
+    for(const [label,state] of [['Open','open'],['Close','close']]){
+      await clickElement(buttonWithin(first.card,label));action=await run('panelActions.at(-1)');url=new URL(action.path,'http://controller');
+      assert.equal(url.pathname,'/api/valve');assert.equal(url.searchParams.get('valve'),sharedValve);assert.equal(url.searchParams.get('state'),state);
+    }
+    const beforeInvalid=await run('panelActions.length');first.seconds.reportValidity=()=>false;
+    await clickElement(buttonWithin(first.card,'Water zone'));await clickElement(buttonWithin(first.card,'Water'));
+    assert.equal(await run('panelActions.length'),beforeInvalid,'Invalid duration fields must prevent a watering request');first.seconds.reportValidity=()=>true;
+    // Per-zone calibration captures must not follow the legacy global dropdown.
+    ids.get('calibration-zone').value=secondName;
+    await run('panelCalibrationResponse={busy:true,result:null,calibration:{}}');
+    await clickElement(first.captureDry);action=await run('panelActions.at(-1)');
+    assert.equal(action.path,'/api/calibrate');assert.deepEqual({...action.body},{zone:firstName,point:'dry'});
+    for(const refs of [first,second,sensorOnly]){assert.equal(refs.captureDry.disabled,true);assert.equal(refs.captureWet.disabled,true);}
+    sandbox.panelCaptureResult={busy:false,result:{zone:firstName,point:'dry',raw:16000,samples:40,spread_raw:16},calibration:{[firstName]:{dry_raw:16000,wet_raw:8000},[secondName]:{dry_raw:17000,wet_raw:8500}}};
+    await run('panelCalibrationResponse=panelCaptureResult;loadCalibration()');
+    assert.match(first.calibration.textContent,/16,?000/);assert.doesNotMatch(second.calibration.textContent,/16,?000/);
+    for(const refs of [first,second]){assert.equal(refs.captureDry.disabled,false);assert.equal(refs.captureWet.disabled,false);}
+    ids.get('calibration-zone').value=firstName;
+    sandbox.panelCaptureResult={busy:false,result:{zone:secondName,point:'wet',raw:7890,samples:42,spread_raw:12},calibration:{[firstName]:{dry_raw:16000,wet_raw:8000},[secondName]:{dry_raw:17000,wet_raw:7890}}};
+    await run('panelCalibrationResponse=panelCaptureResult');await clickElement(second.captureWet);action=await run('panelActions.at(-1)');
+    assert.deepEqual({...action.body},{zone:secondName,point:'wet'});
+    assert.match(second.calibration.textContent,/7,?890/);assert.doesNotMatch(first.calibration.textContent,/7,?890/);
+    const beforeRefresh=await run('panelCalibrationReads');await clickElement(buttonWithin(first.card,'Refresh sensor'));
+    assert.ok(await run('panelCalibrationReads')>beforeRefresh,'Sensor refresh must retrieve current calibration results');
+    // A configuration reload adopts changed defaults only for untouched fields.
+    // Explicit manual overrides remain useful when another setting is saved.
+    await run('model.zones[0].water_duration_sec=21;model.zones[1].water_duration_sec=31;renderLive();renderStatus();');
+    assert.equal((await run('model.zoneNodes.get(panelFixture.zones[0].name)')).seconds.value,'47','A manually edited duration survives configuration reload');
+    assert.equal((await run('model.zoneNodes.get(panelFixture.zones[1].name)')).seconds.value,'31','An untouched duration follows its newly saved default');
+  }finally{
+    sandbox.panelRestore=snapshot;
+    await run('post=savedPanelPost;request=savedPanelRequest;refreshStatus=savedPanelRefresh;Object.assign(model,panelRestore);renderLive();renderStatus();');
+    document.activeElement=null;
+  }
+}
 (async()=>{
   for(const script of scripts)await run(script);
   assert.match(ids.get('connection').textContent,/online/);
@@ -112,6 +211,7 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
       assert.equal(await run('JSON.stringify(updateAudit[1].body)'),'{}');
       assert.equal(await run('updateAudit.length'),2,'Checks must not trigger an installation');
     }finally{await run('post=savedUpdatePost');sandbox.restoredUpdateStatus=JSON.parse(originalStatus);await run('model.status=restoredUpdateStatus;renderUpdate()');}
+    await auditCompactZones();
     // The request queue must survive a rejection and serialize simultaneous jobs.
     failNext=true;
     await run("Promise.allSettled([request('/api/status'),request('/api/settings'),request('/api/events')])");
@@ -159,7 +259,7 @@ async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]
     // Render malicious names as literal text; no HTML parsing is used.
     await run("model.zones.push({name:'<img src=x onerror=alert(1)>',channel:3,valves:[]});renderLive();renderStatus();");
     assert.match(ids.get('zones-live').textContent,/<img src=x/);
-    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['system theme default','stored theme reload','invalid preference fallback','blocked storage fallback','theme toggle accessibility','system theme changes','manual preference overrides system','chart and legend theme redraw','theme changes stay local','standalone update status','retained release selection survives polling','busy update controls','literal update errors','offline and clock guidance','automatic update hold and opt-out','manual version check without install','startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','safe DOM text']},null,2));
+    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['system theme default','stored theme reload','invalid preference fallback','blocked storage fallback','theme toggle accessibility','system theme changes','manual preference overrides system','chart and legend theme redraw','theme changes stay local','standalone update status','retained release selection survives polling','busy update controls','literal update errors','offline and clock guidance','automatic update hold and opt-out','manual version check without install','startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','safe DOM text','zone gauge accessibility','unavailable percentage never zero','raw zero stays visible','percentage clamping','invalid raw stays unavailable','duration edit and focus survive polling','shared valve status remains consistent','unassigned valve controls retained','sensor-only zone disables watering','zone watering duration and target','per-zone valve start and stop routes','invalid duration prevents requests','per-zone calibration target','busy capture disables every zone','calibration result stays with its zone','per-zone sensor refresh','untouched durations follow changed defaults','manual duration override survives configuration reload']},null,2));
   } catch(error) { console.error('AUDIT FAILURE',error);throw error; } finally {
     sandbox.restoreZones=JSON.parse(savedZones);sandbox.restoreSchedules=JSON.parse(savedSchedules);
     await run("request('/api/zones').then(zones=>post('/api/zones',{zones:restoreZones,renames:zones.some(z=>z.name==='Audit tomatoes')?{'Audit tomatoes':restoreZones[0].name}:{}}))");

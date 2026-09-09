@@ -6,7 +6,7 @@ A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.
 
 ## Project status
 
-The current application is **2.0.0-rebuild.5**, a **prerelease** adding independent GitHub updates over verified HTTPS, automatic idle-time installation and selection of retained compatible releases. Dashboard dark mode and GPIO2 RGB status colors remain included. See the [release notes](docs/releases.md) for the one-time upgrade from earlier versions. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
+The current application is **2.0.0-rebuild.6**, a **prerelease** with a compact dashboard that groups moisture gauges, watering controls and sensor commands by zone. A sunset-to-sky background and sand-colored zone panels complement the existing dark mode. Independent GitHub updates over verified HTTPS, automatic idle-time installation, retained compatible releases and GPIO2 RGB status colors remain included. See the [release notes](docs/releases.md) for changes and upgrade compatibility. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
 The previous application, **2.0.0-rebuild.2**, was installed on a classic ESP32-D0WD-V3 with 4 MB flash. Its validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. That bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**. Current release checks and the distinction from earlier hardware measurements are recorded in the [validation report](docs/validation.md).
 
@@ -21,7 +21,7 @@ The installed bench board has both automatic watering modes disabled. **Fresh ap
 | Output supervision | Closure at boot, monotonic deadlines, hard maximum run duration, startup grace, hardware watchdog and persistent watering intent |
 | Schedule persistence | Occurrences recorded before activation to prevent duplicate starts after resets or backward clock changes |
 | Sensors | Up to 4 ADS1115 boards on one I2C bus; optional AHT20, BMP280 and digital rain indication; bounded reads and bus recovery |
-| Dashboard | Light/dark themes with a remembered browser preference; live status, controls, charts, schedules, settings, calibration, GPIO map, weather, Wi-Fi and diagnostics |
+| Dashboard | Compact zone panels with 0–100% moisture dials, raw ADC readings and local watering/sensor controls; remembered light/dark preference, charts, schedules, settings, calibration, GPIO map, weather, Wi-Fi and diagnostics |
 | RGB status LED | GPIO2 addressable RGB: green connected, blue watering, yellow disconnected, white setup/rescue hotspot |
 | Networking | Bounded nonblocking HTTP, DNS, NTP and update transfers; Wi-Fi retry/backoff, setup/rescue hotspot and gateway health checks |
 | Configuration | Validated settings, rename propagation, import/export, separate credentials and migration support for the original project |
@@ -79,6 +79,14 @@ The hostname is `planter`; automatic `planter.local` resolution depends on firmw
 
 Use the dashboard to map each soil zone to its ADC channel and valves, calibrate dry/wet readings, then set its dry threshold, wet target and run duration. Configure daily schedules separately. Manual zone or all-valve actions run mapped valves sequentially; **Stop all** cancels pending runs and moisture recheck cycles. Saving settings can stop and cancel queued watering, and hardware/pin changes require a reboot.
 
+Each growing-zone panel brings its moisture reading, sensor commands, watering
+duration and mapped valve controls together. The speedometer-style dial has a
+0–100% scale around its edge and the raw ADC reading inside. A missing sensor
+is shown as unavailable rather than as a zero-moisture reading. Compact spacing
+keeps more zones visible; expand the shared configuration and maintenance
+sections when you need them. The light theme blends sunset orange at the top
+into sky blue at the bottom, with beach-sand beige zone panels.
+
 Use the **Dark mode** toggle in the dashboard header to change appearance. On
 first visit, the dashboard follows the browser's system color preference; an
 explicit choice is remembered in that browser. Theme changes do not change
@@ -118,7 +126,7 @@ Use Python 3.10+ and Node.js 22+. From a new checkout:
 git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
 cd ESP32-watering-rebuild
 python -m pip install -r requirements-dev.txt
-python tools/build.py --version 2.0.0-rebuild.5
+python tools/build.py --version 2.0.0-rebuild.6
 python tools/check.py
 ```
 

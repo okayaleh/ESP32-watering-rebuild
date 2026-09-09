@@ -1,5 +1,26 @@
 # Validation report
 
+## 2.0.0-rebuild.6 — compact zone dashboard
+
+Prepublication checks on **2026-09-09** cover the compact zone layout,
+speedometer moisture gauges, grouped valve and sensor controls, tighter
+spacing, sunset-to-sky background and sand-colored panels. The controller
+backend, native MicroPython image and boot helpers are unchanged.
+
+| Check | Result and scope |
+| --- | --- |
+| Host suite | All 233 host tests passed in 18.992 seconds. |
+| Dashboard DOM audit | All 50 behavior checks passed, including existing update, theme and request-queue behavior. Regression checks confirm untouched watering-duration inputs follow refreshed defaults while a manual duration override is preserved. |
+| Real Chrome | Light and dark views at 1280-, 390- and 320-pixel widths showed no horizontal overflow or page JavaScript errors. Fixtures covered long names, shared and multiple mapped valves, sensor-only zones, raw ADC zero, missing readings and 100% moisture. Navigation expansion and history-chart redraw also passed. These are browser fixtures, not physical sensor measurements. |
+| Default-view height | With the same two-zone fixture, document height fell from 4,626 to 968 pixels at a 1280×900 viewport (79.1%), and from 7,292 to 1,367 pixels at 390×900 (81.3%). Shared sections were in their default collapsed state. Actual height depends on zone count, names, mappings and expanded sections. |
+| Text contrast samples | Selected zone text, SVG labels, primary buttons and danger buttons measured at least 5.02:1 in light mode and 6.63:1 in dark mode. These samples are not a complete accessibility conformance audit. |
+| Dashboard artifacts | The local dashboard is 76,180 bytes, or 22,525 bytes gzip. |
+| Existing board baseline | A read-only LAN status check found the installed .5 controller online, reporting 79,180 seconds uptime and no safety fault. This is a pre-update observation, not a .6 installation or multi-day soak result. |
+
+At this checkpoint, publication and .6 physical deployment have not been
+recorded. Earlier .5 GitHub OTA acceptance and .2
+hardware measurements below retain their original scope.
+
 ## 2.0.0-rebuild.5 — independent GitHub updates
 
 This release adds direct HTTPS downloads, a bounded immutable-commit channel,
@@ -198,7 +219,7 @@ Stock ESP32_GENERIC 1.28 encountered a native allocation failure during startup 
 
 ## Remaining commissioning
 
-Real valve polarity, driver bias during reset/power loss, flow closure, sensor accuracy, physical I2C deadlines, brownout recovery, and electrical power-cut durability remain untested. Initial home-LAN association, IP assignment, NTP synchronization, and laptop-to-board HTTP have now been observed. DHCP renewal, router/ISP outage recovery, DNS/NTP failure recovery, and end-to-end OTA on that network remain untested. Neither the short home-LAN observation nor loopback stress proves the original intermittent MicroPython/lwIP listener stall is eliminated. A 48–72-hour network soak remains outstanding.
+Real valve polarity, driver bias during reset/power loss, flow closure, sensor accuracy, physical I2C deadlines, brownout recovery, and electrical power-cut durability remain untested. Initial home-LAN association, IP assignment, NTP synchronization, and laptop-to-board HTTP have now been observed. The earlier end-to-end OTA gap was closed by the September 7 automatic GitHub download, installation and reboot into .5 recorded above. DHCP renewal, router/ISP outage recovery and DNS/NTP failure recovery remain untested on the physical network. Neither the short home-LAN observation nor loopback stress proves the original intermittent MicroPython/lwIP listener stall is eliminated. A 48–72-hour network soak remains outstanding.
 
 Follow [commissioning.md](commissioning.md) with the actual board, supply, sensors, valves, and router. A read-only HTTP soak can be recorded with:
 

@@ -3,6 +3,27 @@
 [Documents](README.md) · [Updates and rollback](ota.md) ·
 [All GitHub releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases)
 
+## 2.0.0-rebuild.6 — compact zone dashboard
+
+- Compact square-style growing-zone panels group moisture readings, watering
+  duration, mapped valve controls and sensor commands around each zone.
+- Speedometer-style moisture dials show a 0–100% outer scale and the raw ADC
+  reading inside. Unavailable sensors remain visibly distinct from dry soil.
+- Tighter spacing and expandable shared configuration and maintenance sections
+  reduce scrolling while keeping schedules, history, weather, diagnostics,
+  backup and firmware updates available.
+- The light-theme page blends sunset orange at the top into sky blue at the
+  bottom. Beach-sand beige panels hold the zone information. The remembered
+  dark-mode preference and accessible theme toggle remain available.
+
+This release changes the dashboard, with no controller API, watering logic,
+settings-format or native-platform changes. Install through the standalone
+GitHub updater on .5 or later; no USB reflash or settings migration is needed.
+The .5 release remains a compatible standalone rollback choice, while .3 and
+.2 archives remain available for USB/mirror recovery. See the
+[update guide](ota.md) and [validation report](validation.md) for scope and
+recorded checks.
+
 ## 2.0.0-rebuild.5 — independent GitHub updates
 
 - The ESP32 can fetch application updates directly from the public GitHub

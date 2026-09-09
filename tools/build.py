@@ -132,7 +132,7 @@ def build(version, compiler=None):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--version", default="2.0.0-rebuild.5")
+    parser.add_argument("--version", default="2.0.0-rebuild.6")
     parser.add_argument("--mpy-cross")
     args = parser.parse_args()
     if not re.fullmatch(r"[A-Za-z0-9._-]{1,64}", args.version):
