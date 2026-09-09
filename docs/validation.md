@@ -2,7 +2,7 @@
 
 ## 2.0.0-rebuild.6 — compact zone dashboard
 
-Prepublication checks on **2026-09-09** cover the compact zone layout,
+Validation on **2026-09-09** covers the compact zone layout,
 speedometer moisture gauges, grouped valve and sensor controls, tighter
 spacing, sunset-to-sky background and sand-colored panels. The controller
 backend, native MicroPython image and boot helpers are unchanged.
@@ -17,9 +17,36 @@ backend, native MicroPython image and boot helpers are unchanged.
 | Dashboard artifacts | The local dashboard is 76,180 bytes, or 22,525 bytes gzip. |
 | Existing board baseline | A read-only LAN status check found the installed .5 controller online, reporting 79,180 seconds uptime and no safety fault. This is a pre-update observation, not a .6 installation or multi-day soak result. |
 
-At this checkpoint, publication and .6 physical deployment have not been
-recorded. Earlier .5 GitHub OTA acceptance and .2
-hardware measurements below retain their original scope.
+### Published .6 release and board acceptance
+
+GitHub validation and the release-publishing workflow passed for commit
+`d7e3d3d0468819c8c7b9adbaec464cd5da541c30`.
+[Version .6](https://github.com/okayaleh/ESP32-watering-rebuild/releases/tag/v2.0.0-rebuild.6)
+was published on September 9 at 22:58:57 UTC. The standalone channel retains
+.6 and .5; the older .3 and .2 release archives also remain available.
+
+The real controller installed .6 directly from GitHub over HTTPS after an
+update request on the LAN, restarted and rejoined home Wi-Fi. The laptop did
+not serve update files. Before/after API configuration exports were equal,
+confirming preserved garden settings. A read-only acceptance check reported
+three zones, all valve outputs closed and no safety fault. A subsequent
+status read reported 134 seconds uptime, .6, connected Wi-Fi and no safety or
+update error. This is a normal-runtime observation; the update journal was
+not inspected to establish its stable marker. Two polling failures during
+update/reboot—a host unreachable response and a timeout—recovered afterward.
+
+The served 76,180-byte dashboard exactly matched the release, with SHA-256
+`7b1c4e04acc0f80427b455b8231174af57f0caf2a54c75a38b46e67813a54b02`.
+Real Chrome loaded the board's dashboard in light and dark modes at
+1280×900 and 390×844. All four views rendered three zone panels with no
+horizontal overflow or page JavaScript errors. Document height was 968
+pixels on desktop and 1,770 pixels on mobile. The inspected desktop capture
+showed all three sand-colored zone panels fully visible. Status stayed online
+with outputs closed, and Maintenance navigation exposed **Check for updates**.
+
+No watering commands or sensor calibration captures were triggered on the
+physical board. The native platform was unchanged. Earlier .5 GitHub OTA
+acceptance and .2 hardware measurements below retain their original scope.
 
 ## 2.0.0-rebuild.5 — independent GitHub updates
 
