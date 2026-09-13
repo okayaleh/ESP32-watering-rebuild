@@ -6,7 +6,7 @@ A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.
 
 ## Project status
 
-The current application is **2.0.0-rebuild.6**, a **prerelease** with a compact dashboard that groups moisture gauges, watering controls and sensor commands by zone. A sunset-to-sky background and sand-colored zone panels complement the existing dark mode. Independent GitHub updates over verified HTTPS, automatic idle-time installation, retained compatible releases and GPIO2 RGB status colors remain included. See the [release notes](docs/releases.md) for changes and upgrade compatibility. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
+The current application is **2.0.0-rebuild.7**, a **prerelease** that makes each zone's physical ADS1115 input explicit, chooses the first unused configured input for new zones and clears old readings when sensor configuration changes. The compact dashboard, sunset-to-sky background, sand-colored panels and dark mode remain included, alongside independent GitHub updates, automatic idle-time installation, retained compatible releases and GPIO2 RGB status colors. See the [release notes](docs/releases.md) for changes and upgrade compatibility. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
 The previous application, **2.0.0-rebuild.2**, was installed on a classic ESP32-D0WD-V3 with 4 MB flash. Its validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. That bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**. Current release checks and the distinction from earlier hardware measurements are recorded in the [validation report](docs/validation.md).
 
@@ -81,11 +81,20 @@ Use the dashboard to map each soil zone to its ADC channel and valves, calibrate
 
 Each growing-zone panel brings its moisture reading, sensor commands, watering
 duration and mapped valve controls together. The speedometer-style dial has a
-0–100% scale around its edge and the raw ADC reading inside. A missing sensor
-is shown as unavailable rather than as a zero-moisture reading. Compact spacing
+0–100% scale around its edge and the raw ADC reading inside. A failed ADC read
+is shown as unavailable rather than as zero moisture. An unplugged analog probe
+can still produce a floating ADC reading; the percentage alone cannot confirm
+that a probe is connected. Compact spacing
 keeps more zones visible; expand the shared configuration and maintenance
 sections when you need them. The light theme blends sunset orange at the top
 into sky blue at the bottom, with beach-sand beige zone panels.
+
+The zone's **Sensor input** identifies the ADS board, address and A0–A3 pin.
+Separate probes need their own inputs; a shared-input warning identifies zones
+reading the same physical input. The dial is relative to that probe's saved
+dry/wet calibration, not a measurement of volumetric soil water content. See
+[sensor mapping and calibration troubleshooting](docs/troubleshooting.md#moisture-stays-at-0-or-100-or-several-zones-read-alike)
+before calibrating a new probe or interpreting an empty input.
 
 Use the **Dark mode** toggle in the dashboard header to change appearance. On
 first visit, the dashboard follows the browser's system color preference; an
@@ -126,7 +135,7 @@ Use Python 3.10+ and Node.js 22+. From a new checkout:
 git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
 cd ESP32-watering-rebuild
 python -m pip install -r requirements-dev.txt
-python tools/build.py --version 2.0.0-rebuild.6
+python tools/build.py --version 2.0.0-rebuild.7
 python tools/check.py
 ```
 

@@ -1,5 +1,41 @@
 # Validation report
 
+## 2.0.0-rebuild.7 — explicit sensor inputs and fresh readings
+
+Prepublication checks on **2026-09-13** cover physical ADS1115 input labels,
+unused-input selection for new zones, shared-input warnings and invalidation
+of stale samples after sensor reconfiguration. The native platform and boot
+helpers are unchanged.
+
+| Check | Result and scope |
+| --- | --- |
+| Host suite | All 236 host tests passed in 20.968 seconds. Three new Python regression tests cover distinct A0–A3 readings, the ADS1115 conversion-busy state, fresh samples after mapping/address/calibration changes and discarding a pending conversion's old result. These use simulated hardware. |
+| Dashboard DOM audit | All 59 named checks passed. Nine new input-assignment cases include multiple ADC boards, all configured inputs occupied and intentional sharing. Existing dashboard, update, theme and request-queue checks remain included. |
+| Real Chrome | Light and dark views at 1280×900 and 390×844 showed no horizontal overflow or page JavaScript errors. The physical-input selector occupies the full available width on mobile. With all configured inputs occupied, the new zone's blank required selector was invalid until an input was chosen. These checks use browser fixtures. |
+| Shared-input warning contrast | Sampled panel and editor warning text measured at least 5.20:1 in light mode and 8.96:1 in dark mode. This is a scoped contrast check, not a complete accessibility audit. |
+| Application artifacts | The manifest contains 22 OTA files. HTML is 78,632 bytes and gzip is 23,255 bytes. `moisture.mpy` is 3,428 bytes, an increase of 36 bytes. |
+
+### Existing-board diagnosis and mapping correction
+
+On September 13, the board's saved configuration assigned all three zones
+to global channel 0, with generic calibration endpoints of 17,500 dry and
+8,000 wet. A private configuration backup was created, then the existing
+garden's mappings were corrected to channel 0/A0 for zone 1, channel 1/A1 for
+zone 2 and channel 2/A2 for zone 3 on the first ADC. Before/after API exports
+confirmed that only those channel assignments changed. Both automatic
+watering modes remained disabled and all valve outputs were closed.
+
+This was a correction to this board's saved garden configuration, separate
+from the .7 application update. OTA preserves existing mappings and
+calibration; it does not automatically assign new inputs to existing zones.
+No physical dry/wet calibration has been performed during this investigation,
+and no ADC hardware fault has been established. Empty analog inputs are not
+valid probe measurements; raw values and a percentage alone do not identify
+an unplugged probe.
+
+At this checkpoint, publication and physical .7 deployment have not been
+recorded. Earlier release evidence below retains its original scope.
+
 ## 2.0.0-rebuild.6 — compact zone dashboard
 
 Validation on **2026-09-09** covers the compact zone layout,

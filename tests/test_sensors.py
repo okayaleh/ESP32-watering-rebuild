@@ -66,6 +66,40 @@ class Bus:
         return b"\x80\x00" if register == 1 else struct.pack(">h", self.raw)
 
 
+class MuxBus(Bus):
+    """Latch the selected input at start; expose it only after OS is ready."""
+    def __init__(self, inputs, busy_reads=2):
+        super().__init__(tuple(sorted({address for address, channel in inputs})))
+        self.inputs = inputs
+        self.busy_reads = busy_reads
+        self.conversions = {}
+        self.samples = []
+
+    def writeto_mem(self, address, register, data):
+        super().writeto_mem(address, register, data)
+        prior = self.conversions.get(address)
+        if prior and prior[1]:
+            raise AssertionError("New conversion started while ADC is busy")
+        config = int.from_bytes(data, "big")
+        if config & 0x8fff != 0x8383:
+            raise AssertionError("Expected single-shot, +/-4.096 V, 128 SPS")
+        channel = ((config >> 12) & 7) - 4
+        self.conversions[address] = [self.inputs[address, channel], self.busy_reads]
+
+    def readfrom_mem(self, address, register, count):
+        super().readfrom_mem(address, register, count)
+        conversion = self.conversions[address]
+        if register == 1:
+            if conversion[1]:
+                conversion[1] -= 1
+                return b"\x00\x00"
+            return b"\x80\x00"
+        if conversion[1]:
+            raise AssertionError("Conversion register read before ready")
+        self.samples.append((address, conversion[0]))
+        return struct.pack(">h", conversion[0])
+
+
 def settings(channels=None):
     return {"hardware": {"zone_channels": channels or {"bed": 0},
                          "ads1115_addresses": [0x48, 0x49, 0x4a, 0x4b],
@@ -106,6 +140,59 @@ class SensorTests(unittest.TestCase):
         self.assertEqual((config >> 12) & 7, 7)
         self.assertEqual(sensor.readings["far"]["raw"], 15000)
         self.assertGreaterEqual(bus.scans, 1)
+
+    def test_four_inputs_wait_for_ready_and_keep_distinct_samples(self):
+        raw = (21561, 15000, 11000, 7333)
+        bus = MuxBus({(0x48, channel): value for channel, value in enumerate(raw)})
+        sensor = MoistureManager(bus, settings({"zone%d" % i: i for i in range(4)}))
+        drive(sensor, step=1)
+        self.assertEqual([sensor.readings["zone%d" % i]["raw"] for i in range(4)], list(raw))
+        self.assertEqual([int.from_bytes(write[2], "big") >> 12 & 7 for write in bus.writes], [4, 5, 6, 7])
+        self.assertEqual(bus.samples, [(0x48, value) for value in raw])
+        self.assertEqual(sensor.readings["zone0"]["percent"], 0)
+        self.assertEqual(sensor.readings["zone3"]["percent"], 100)
+
+    def test_reconfigure_invalidates_in_place_input_and_calibration_changes(self):
+        config = settings()
+        bus = MuxBus({(0x48, 0): 21561, (0x48, 1): 15000, (0x49, 1): 12500})
+        sensor = MoistureManager(bus, config)
+        drive(sensor)
+        self.assertEqual(sensor.readings["bed"]["raw"], 21561)
+        changes = (
+            ("zone_channels", {"bed": 1}, 15000, percent(15000, 17500, 8000)),
+            ("ads1115_addresses", [0x49], 12500, percent(12500, 17500, 8000)),
+            ("zone_calibration", {"bed": {"dry_raw": 20000, "wet_raw": 10000}}, 12500, 75),
+        )
+        for index, (key, value, raw, expected_percent) in enumerate(changes):
+            with self.subTest(change=key):
+                config["hardware"][key] = value
+                sensor.configure(config)
+                self.assertIsNone(sensor.readings["bed"]["raw"])
+                self.assertIsNone(sensor.readings["bed"]["percent"])
+                self.assertIsNone(sensor.readings["bed"]["updated_ms"])
+                # Reconfiguration cannot wait for the old 15-second deadline.
+                start = 1000 + index * 1000
+                drive(sensor, start=start, end=start + 500)
+                self.assertEqual(sensor.readings["bed"]["raw"], raw)
+                self.assertEqual(sensor.readings["bed"]["percent"], expected_percent)
+                self.assertGreaterEqual(sensor.readings["bed"]["updated_ms"], start)
+
+    def test_remap_discards_pending_conversion_before_starting_new_input(self):
+        bus = MuxBus({(0x48, 0): 21561, (0x48, 1): 7333})
+        config = settings()
+        sensor = MoistureManager(bus, config)
+        now = 0
+        while not sensor.pending and now < 100:
+            sensor.poll(now)
+            now += 1
+        self.assertIsNotNone(sensor.pending)
+        config["hardware"]["zone_channels"]["bed"] = 1
+        sensor.configure(config)
+        self.assertIsNone(sensor.readings["bed"]["raw"])
+        drive(sensor, start=now, end=500, step=1)
+        self.assertEqual(bus.samples, [(0x48, 7333)])
+        self.assertEqual(sensor.readings["bed"]["raw"], 7333)
+        self.assertEqual(len(bus.writes), 2)
 
     def test_absent_boards_issue_no_conversions_and_back_off(self):
         bus = Bus(())

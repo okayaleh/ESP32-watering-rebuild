@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-rebuild.6",
+  "version": "2.0.0-rebuild.7",
   "mpy": "6.3",
   "files": [
     {
@@ -53,8 +53,8 @@
     {
       "name": "moisture.mpy",
       "path": "build/moisture.mpy",
-      "size": 3392,
-      "sha256": "ea87bfed301eb61fec673696e669f4945e534625fde3a3bfc76bad9f32923ad6"
+      "size": 3428,
+      "sha256": "7b66826876c7507c3e5eaa795418ef4326dd2ecbcf958df48fe1b074f1875abf"
     },
     {
       "name": "persistence.mpy",
@@ -119,20 +119,20 @@
     {
       "name": "index.html",
       "path": "build/index.html",
-      "size": 76180,
-      "sha256": "7b1c4e04acc0f80427b455b8231174af57f0caf2a54c75a38b46e67813a54b02"
+      "size": 78632,
+      "sha256": "e0391e1e5d4a753b524e5a752786aaee0555119a652b518ad88b4c1f632de58c"
     },
     {
       "name": "index.html.gz",
       "path": "build/index.html.gz",
-      "size": 22525,
-      "sha256": "4dd9b991153bac77e79b85703acd029fe23919dfc51fc5bbd4bd51bfacfc7ef2"
+      "size": 23255,
+      "sha256": "d50cd5d31728d45f04b1471767ddcbf05e88a81abec611086db60377b393d082"
     },
     {
       "name": "version.json",
       "path": "build/version.json",
       "size": 31,
-      "sha256": "2125b1622de701185d833a838203c82f02b36322f047c2bb0ac389dda9ecfd70"
+      "sha256": "0948cb86bca7a059a40244a4f6ca23d2318ad3168c98b76266770b3dc49f2827"
     }
   ],
   "platform": "planter-esp32-romfs-mpy6",

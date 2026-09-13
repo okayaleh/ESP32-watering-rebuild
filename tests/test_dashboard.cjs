@@ -56,6 +56,44 @@ async function run(code){return vm.runInContext(code,sandbox);}
 async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]||[])await fn({preventDefault(){},currentTarget:ids.get(id)});if(ids.get('toast').className.includes('error'))throw Error(ids.get('toast').textContent);}
 async function clickElement(element){assert.ok(element,'Expected a control in its zone panel');for(const fn of element.listeners.click||[])await fn({preventDefault(){},currentTarget:element});if(ids.get('toast').className.includes('error'))throw Error(ids.get('toast').textContent);}
 function buttonWithin(element,label){return element.all().find(child=>child.tagName==='BUTTON'&&child.textContent===label);}
+async function auditSensorAssignments(){
+  const snapshot=await run('({zones:model.zones,settings:model.settings})');
+  try{
+    await run('model.settings={...model.settings,hardware:{...model.settings.hardware,ads1115_addresses:[75,72]}};model.zones=[{name:"First",channel:0,valves:[]},{name:"Third",channel:2,valves:[]}];renderZones();renderLive();');
+    assert.match(ids.get('zones-live').textContent,/Board 1 · ADS 0x4B · A0/);
+    assert.match(ids.get('zones-live').textContent,/Board 1 · ADS 0x4B · A2/);
+    assert.equal(await run('adcChannelLabel(5)'),'Board 2 · ADS 0x48 · A1');
+    await fire('add-zone');assert.equal(await run('zoneRows.at(-1).channel.value'),'1','A new zone must choose the first unused configured input');
+    await fire('add-zone');assert.equal(await run('zoneRows.at(-1).channel.value'),'3','Unsaved rows reserve their selected input');
+    await fire('add-zone');assert.equal(await run('zoneRows.at(-1).channel.value'),'4','Allocation follows configured board order');
+    const edited=await run('zoneRows.at(-1).channel');edited.value='5';for(const fn of edited.listeners.change||[])await fn();
+    await fire('add-zone');assert.equal(await run('zoneRows.at(-1).channel.value'),'4','Changing an unsaved assignment frees its old input');
+    assert.equal((await run('zoneRows.at(-1).channel.children.find(option=>option.value==="5")')).textContent,'Board 2 · ADS 0x48 · A1');
+    await clickElement(buttonWithin(await run('zoneRows[0].card'),'Remove'));
+    await fire('add-zone');assert.equal(await run('zoneRows.at(-1).channel.value'),'0','Removing a saved row frees its input before saving');
+    await run('model.settings.hardware.ads1115_addresses=[72];model.zones=[0,1,2,3].map(channel=>({name:"Bed "+channel,channel,valves:[]}));renderZones();');
+    await fire('add-zone');
+    const full=await run('zoneRows.at(-1)');assert.equal(full.channel.value,'');assert.equal(full.channel.required,true);
+    assert.deepEqual(full.channel.children.map(option=>option.value),['','0','1','2','3']);
+    assert.throws(()=>full.read(),/Choose a sensor input/,'Full boards must never silently reuse A0');
+    const beforeInvalid=requests.length;
+    await assert.rejects(fire('zone-form','submit'),/Choose a sensor input/);
+    assert.equal(requests.length,beforeInvalid,'A missing selection cannot be serialized as channel zero');
+    ids.get('toast').className='toast';ids.get('toast').hidden=true;
+    full.channel.value='2';for(const fn of full.channel.listeners.change||[])await fn();
+    assert.equal(full.read().channel,2,'Intentional shared inputs remain selectable');
+    assert.equal(full.channelWarning.hidden,false);assert.match(full.channelWarning.textContent,/Shared by 2 zones/);
+    await run('model.zones=[{name:"Shared one",channel:0,valves:[]},{name:"Shared two",channel:0,valves:[]}];renderZones();renderLive();');
+    assert.equal(await run('zoneRows.map(row=>row.read().channel).join(",")'),'0,0','Existing shared mappings must be preserved');
+    for(const row of await run('zoneRows')){assert.equal(row.channelWarning.hidden,false);assert.match(row.channelWarning.textContent,/same sensor input/);}
+    for(const refs of await run('[...model.zoneNodes.values()]'))assert.match(refs.card.textContent,/Shared by 2 zones/);
+    const sharedInput=await run('zoneRows[1].channel');sharedInput.value='1';for(const fn of sharedInput.listeners.change||[])await fn();
+    for(const row of await run('zoneRows'))assert.equal(row.channelWarning.hidden,true,'Editing a shared mapping clears both editor warnings');
+    assert.match(source,/An unconnected input can float and look wet/);
+  }finally{
+    sandbox.sensorRestore=snapshot;await run('Object.assign(model,sensorRestore);renderZones();renderLive();renderStatus();');
+  }
+}
 async function auditCompactZones(){
   const snapshot=await run('({zones:model.zones,valves:model.valves,status:model.status,settings:model.settings,calibrating:model.calibrating,captureZone:model.captureZone,calibrationData:model.calibrationData})');
   const firstName='<img src=x onerror=alert(1)> / A & B',secondName='Second bed',sharedValve='Shared & bed/?',spareValve='Unassigned valve';
@@ -211,6 +249,7 @@ async function auditCompactZones(){
       assert.equal(await run('JSON.stringify(updateAudit[1].body)'),'{}');
       assert.equal(await run('updateAudit.length'),2,'Checks must not trigger an installation');
     }finally{await run('post=savedUpdatePost');sandbox.restoredUpdateStatus=JSON.parse(originalStatus);await run('model.status=restoredUpdateStatus;renderUpdate()');}
+    await auditSensorAssignments();
     await auditCompactZones();
     // The request queue must survive a rejection and serialize simultaneous jobs.
     failNext=true;
@@ -259,7 +298,7 @@ async function auditCompactZones(){
     // Render malicious names as literal text; no HTML parsing is used.
     await run("model.zones.push({name:'<img src=x onerror=alert(1)>',channel:3,valves:[]});renderLive();renderStatus();");
     assert.match(ids.get('zones-live').textContent,/<img src=x/);
-    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['system theme default','stored theme reload','invalid preference fallback','blocked storage fallback','theme toggle accessibility','system theme changes','manual preference overrides system','chart and legend theme redraw','theme changes stay local','standalone update status','retained release selection survives polling','busy update controls','literal update errors','offline and clock guidance','automatic update hold and opt-out','manual version check without install','startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','safe DOM text','zone gauge accessibility','unavailable percentage never zero','raw zero stays visible','percentage clamping','invalid raw stays unavailable','duration edit and focus survive polling','shared valve status remains consistent','unassigned valve controls retained','sensor-only zone disables watering','zone watering duration and target','per-zone valve start and stop routes','invalid duration prevents requests','per-zone calibration target','busy capture disables every zone','calibration result stays with its zone','per-zone sensor refresh','untouched durations follow changed defaults','manual duration override survives configuration reload']},null,2));
+    console.log(JSON.stringify({result:'passed',startupRequests:requests.slice(0,6),maxConcurrentFetches:maximum,checks:['system theme default','stored theme reload','invalid preference fallback','blocked storage fallback','theme toggle accessibility','system theme changes','manual preference overrides system','chart and legend theme redraw','theme changes stay local','standalone update status','retained release selection survives polling','busy update controls','literal update errors','offline and clock guidance','automatic update hold and opt-out','manual version check without install','startup','environment','system','chart','queue failure recovery','overlapping polls','stop action preempts stalled history read','cancelled read releases queue','pinmap','scan handshake','schedule add','zone rename propagation','zone add','export','calibration preservation','physical ADS channel labels','first unused configured channel','unsaved channel reservations','changed and removed assignments free inputs','full board requires explicit selection','missing selection prevents save','intentional shared mappings preserved','shared sensor warnings update','floating input explanation','safe DOM text','zone gauge accessibility','unavailable percentage never zero','raw zero stays visible','percentage clamping','invalid raw stays unavailable','duration edit and focus survive polling','shared valve status remains consistent','unassigned valve controls retained','sensor-only zone disables watering','zone watering duration and target','per-zone valve start and stop routes','invalid duration prevents requests','per-zone calibration target','busy capture disables every zone','calibration result stays with its zone','per-zone sensor refresh','untouched durations follow changed defaults','manual duration override survives configuration reload']},null,2));
   } catch(error) { console.error('AUDIT FAILURE',error);throw error; } finally {
     sandbox.restoreZones=JSON.parse(savedZones);sandbox.restoreSchedules=JSON.parse(savedSchedules);
     await run("request('/api/zones').then(zones=>post('/api/zones',{zones:restoreZones,renames:zones.some(z=>z.name==='Audit tomatoes')?{'Audit tomatoes':restoreZones[0].name}:{}}))");

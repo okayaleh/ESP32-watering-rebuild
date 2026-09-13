@@ -62,6 +62,17 @@ Small JSON writes use temp files, flush/sync, readback verification and a previo
 
 `moisture.py` scans before touching absent ADCs, splits conversions across polls, isolates errors by board/zone, and backs off total failures. Bus recovery only drives low or releases a line. `env_sensors.py` performs incremental AHT20 and BMP280 reads and validates AHT CRC. Calibration averages10s and reports sample count/range/spread; watering pauses during capture.
 
+Sensor reconfiguration clears cached samples and requests a fresh scan/cycle.
+If a conversion was already in progress, its result is discarded after the
+conversion finishes so it cannot be attributed to a remapped zone. The
+dashboard labels the physical ADS1115 board/address/input, chooses unused
+configured inputs for new zones and warns about intentional or accidental
+sharing. Existing mappings remain authoritative. Moisture percentage is the
+raw reading interpolated between saved dry/wet endpoints and clamped to
+0–100%; it is not volumetric water content. A responding ADC cannot establish
+that an analog probe is plugged in, so no raw-value disconnect heuristic is
+used. See the [sensor troubleshooting guide](troubleshooting.md#moisture-stays-at-0-or-100-or-several-zones-read-alike).
+
 Live history uses180 compact points (one/minute,3h), with shared zone-name tuples and half-percent byte values. Saved history is one point/15min,7-day retention, streamed from flash. Excluded/torn records yield a transport checkpoint; pruning processes one record per idle supervisor turn. Normal history records use native JSON encoding one validated record at a time, capped at 4096 bytes and split into 512-byte transport fragments. Larger or unusual legacy records keep generic streaming. Each response caches at most 32 validated zone names. Short strings use native escaping; each client advances at most eight encoder fragments and one socket send per poll. This limits work between control-loop checks and avoids thousands of nested generator steps during a full history download. Original `history.csv` remains readable and untouched. Event buffers are capped64 records and the log rotates around32KiB.
 
 Modules are compiled off-device. Both Python heap and ESP-IDF C-heap free/largest-block figures are exposed. When the sampled largest C-heap block falls below2048 bytes, ordinary requests receive a small503 response; stop requests bypass that shedding rule, although allocation or listener failures can still prevent remote delivery. Streaming bounds JSON/socket fragments, but **does not prove that every allocation in a status/settings operation is below512 bytes**: configuration parsing, copies and a16-zone history record allocate more. Two16KiB request bodies plus parsed settings can materially pressure WROOM memory. Physical full-configuration heap measurements are a release gate; host tests cannot establish the C-heap margin.

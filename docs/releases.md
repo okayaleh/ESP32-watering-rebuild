@@ -3,6 +3,30 @@
 [Documents](README.md) · [Updates and rollback](ota.md) ·
 [All GitHub releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases)
 
+## 2.0.0-rebuild.7 — explicit sensor inputs and fresh readings
+
+- **Add zone** selects the first unused input on the configured ADS1115 boards
+  instead of defaulting every new zone to A0. If all configured inputs are
+  already assigned, choose one explicitly or add the required ADC hardware.
+- Zone input choices and live panels show the physical board, I2C address
+  and A0–A3 pin. Shared-input warnings expose zones reading the same sensor;
+  intentional sharing remains supported.
+- Sensor reconfiguration invalidates cached samples and discards the result
+  of an already-started conversion before reading the new configuration.
+  An old input's reading can no longer be presented as the new input's sample.
+- Dashboard guidance and [troubleshooting](troubleshooting.md#moisture-stays-at-0-or-100-or-several-zones-read-alike)
+  explain floating inputs and the need for probe-specific dry/wet calibration.
+  No guessed threshold is used to label an analog probe disconnected.
+
+Existing saved zone mappings and calibration are preserved by OTA; inspect
+them against the actual AOUT wiring. The update does not automatically remap
+existing gardens or recalibrate sensors. The percentage remains a relative
+calibrated scale, not volumetric water content or proof that a probe is wired.
+The native platform and boot helpers are unchanged. Install with the existing
+standalone GitHub updater; .6 and .5 remain compatible retained releases.
+Validation and physical observations are recorded separately in the
+[validation report](validation.md).
+
 ## 2.0.0-rebuild.6 — compact zone dashboard
 
 - Compact square-style growing-zone panels group moisture readings, watering

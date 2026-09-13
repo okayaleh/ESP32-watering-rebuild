@@ -94,13 +94,22 @@ class MoistureManager:
         self.channels = hardware.get("zone_channels", {})
         addresses = hardware.get("ads1115_addresses", [0x48])
         self.boards = [ADS1115(self.bus, addr) for addr in addresses[:4]]
-        self.readings = {name: self.readings.get(name, {
+        # Settings are also mutated in place by calibration. Configuration is
+        # infrequent, so invalidate every sample instead of retaining a second
+        # mapping/calibration snapshot on the constrained MCU. Neither the
+        # controller nor dashboard may use a previous input's cached reading.
+        self.readings = {name: {
             "name": name, "raw": None, "percent": None,
-            "error": "Waiting for sensor", "updated_ms": None})
+            "error": "Waiting for sensor", "updated_ms": None}
             for name in self.channels}
         self.queue = []
-        self.pending = None
+        if self.pending:
+            # Cancel publication, but wait for the physical conversion to end:
+            # ADS1115 ignores a new single-shot start while already converting.
+            self.pending[0] = None
         self.cycle_active = False
+        self.cycle_success = self.failures = 0
+        self.next_cycle = None  # Start on the next poll, including tick wrap.
         self.scan_requested = True
 
     def request_scan(self):
@@ -191,6 +200,9 @@ class MoistureManager:
                         return
                     self.pending[5] = True
                     return  # One I2C transaction per poll.
+                if zone is None:
+                    self.pending = None  # Discard a pre-configuration sample.
+                    return
                 raw = board.read()
                 # Single-ended soil probes cannot legitimately report negative
                 # or rail-clipped inputs; never water using an invalid sample.
@@ -209,7 +221,8 @@ class MoistureManager:
                     capture["min_raw"] = raw if capture["min_raw"] is None else min(raw, capture["min_raw"])
                     capture["max_raw"] = raw if capture["max_raw"] is None else max(raw, capture["max_raw"])
             except Exception as exc:
-                self._error(zone, str(exc), now_ms)
+                if zone is not None:
+                    self._error(zone, str(exc), now_ms)
                 if board.address in self.found:
                     self.found.remove(board.address)
             self.pending = None
@@ -235,7 +248,7 @@ class MoistureManager:
                 self.probe_ms * 4, self.probe_ms * (2 ** (self.failures - 1)))
             self.next_cycle = ticks_add(now_ms, delay)
             return
-        if ticks_diff(now_ms, self.next_cycle) < 0:
+        if self.next_cycle is not None and ticks_diff(now_ms, self.next_cycle) < 0:
             return
         self.cycle_success = 0
         self.cycle_active = True

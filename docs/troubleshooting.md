@@ -184,6 +184,60 @@ board. Those errors do not mean home Wi-Fi authentication failed. Confirm
 the ADS1115 addresses, board order, shared SDA/SCL wires, 3.3 V pull-ups and
 zone channel mapping in the [hardware guide](hardware.md).
 
+### Moisture stays at 0% or 100%, or several zones read alike
+
+Check wiring, channel assignment and calibration separately. Three zone names
+assigned to global channel 0 all measure A0 on the first configured ADS1115.
+Adding a zone does not add a physical probe. For one board at `0x48`, a
+three-probe arrangement is:
+
+| Zone | Probe AOUT connection | Global channel |
+| --- | --- | --- |
+| First zone | Board 1, ADS `0x48`, A0 | 0 |
+| Second zone | Board 1, ADS `0x48`, A1 | 1 |
+| Third zone | Board 1, ADS `0x48`, A2 | 2 |
+| Unused input | A3; no zone needed | 3 |
+
+This is an example, not an automatic remapping rule. Match each zone to its
+actual wiring. If only one probe is connected, only its input provides a
+probe measurement; separate zones need separate probes unless sharing that
+measurement is intentional.
+
+1. With power off, check common ground, the probe's AOUT wire and the ADC
+   supply. For the classic ESP32's default 3.3 V setup, SDA goes to GPIO21,
+   SCL to GPIO22 and ADDR to GND selects `0x48`. Keep ADC input signals within
+   the ADC's supply rails and I2C pull-ups at 3.3 V. The ADS1115 provides four
+   single-ended inputs; the address and pin requirements are in the
+   [TI datasheet](https://www.ti.com/lit/gpn/ads1115).
+2. In **Garden configuration → Zones**, select the matching **Sensor input**
+   for each connected probe and save. From .7, **Add zone** proposes the first
+   unused configured input and warns when inputs are shared. Existing saved
+   mappings are preserved. After a configuration save, allow a fresh reading.
+3. Compare the raw ADC value while the connected probe is held steadily in
+   your dry reference, then your wet reference. Ignore readings from empty
+   inputs: a floating analog input can produce plausible or changing numbers,
+   including a displayed 100%. TI explains why
+   [floating-input measurements have no useful meaning](https://e2e.ti.com/support/data-converters-group/data-converters/f/data-converters-forum/447745/ads1115-input-channels-are-influence-each-other).
+   Neither a successful I2C scan nor a plausible percentage detects an
+   unplugged probe.
+4. Calibrate only after the connected probe has settled in each known
+   reference. Use **Capture dry**, then move to the wet reference and use
+   **Capture wet**, keeping the probe electronics dry. Each capture averages
+   about ten seconds and saves the endpoint when it succeeds. Review the
+   reported sample spread and repeat after settling if it is unstable. Do
+   not capture an empty input or assume the current probe position is a known
+   dry/wet reference.
+
+The generic endpoints are raw **17,500 dry** and **8,000 wet**. With those
+defaults, raw **7,333** clamps to **100%**, and **21,561** clamps to **0%**.
+These results follow the configured scale and do not establish a sensor
+fault. The dial measures relative moisture between your saved references;
+100% does not establish volumetric saturation. An ADC read error can be
+reported as unavailable, but software cannot reliably identify an unplugged
+analog probe from its raw value alone.
+
+### Watering is refused or does not start
+
 Before treating a refused watering request as a fault, check startup grace,
 automation enable switches, clock synchronization, cooldown/lockout state,
 calibration/update activity, sensor validity and the reported safety fault.
