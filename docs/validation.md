@@ -28,8 +28,8 @@ watering modes remained disabled and all valve outputs were closed.
 This was a correction to this board's saved garden configuration, separate
 from the .7 application update. OTA preserves existing mappings and
 calibration; it does not automatically assign new inputs to existing zones.
-No physical dry/wet calibration has been performed during this investigation,
-and no ADC hardware fault has been established. Empty analog inputs are not
+At that checkpoint, physical dry/wet calibration had not been performed,
+and no ADC hardware fault had been established. Empty analog inputs are not
 valid probe measurements; raw values and a percentage alone do not identify
 an unplugged probe.
 
@@ -64,10 +64,37 @@ readings were raw 21,563 / 0% on zone 1/A0, 7,340 / 100% on zone 2/A1 and
 under the retained generic calibration; the physical dry/wet state of the
 inputs was not confirmed, so they do not establish probe accuracy.
 
-These observations establish deployment and preserved configuration. No
-physical dry/wet calibration, probe-accuracy measurement or physical ADC
-multiplexer acceptance has been completed in this investigation. Earlier
-release evidence below retains its original scope.
+These observations establish deployment and preserved configuration and
+precede the reference captures below. They are not probe-accuracy or physical
+ADC multiplexer acceptance measurements. Earlier release evidence below
+retains its original scope.
+
+### Zone 1/A0 reference calibration follow-up — September 13
+
+The user confirmed the connected probe was in the dry air reference, then
+in the wet water reference, with its AOUT wire kept on A0. Each successful
+capture sampled for approximately ten seconds:
+
+| Reference | Samples | Minimum raw | Maximum raw | Saved mean raw | Spread |
+| --- | --- | --- | --- | --- | --- |
+| Dry air | 19 | 21,566 | 21,568 | 21,567 | 2 |
+| Wet water | 18 | 7,643 | 7,647 | 7,645 | 4 |
+
+Before/after device API configuration exports verified that each save changed
+only the corresponding calibration endpoint. Zone 1's final saved values are
+**21,567 dry** and **7,645 wet**. A subsequent API read confirmed those saved
+values and a fresh zone 1 reading of raw **7,633 / 100.0%**, with no sensor
+error while the probe remained in the wet reference. The channel 0/1/2
+mappings were preserved. Wi-Fi was connected, no safety fault was reported,
+all reported valves were closed and both automatic watering modes remained
+disabled.
+
+These user-confirmed references validate the capture and persistence workflow
+for this probe on zone 1/A0. The earlier readings near 7,333–7,343 on unconfirmed
+or empty inputs were not wet calibration references. Zones 2 and 3 remain
+uncalibrated, and physical measurements on A1–A3 have not been validated.
+Air/water endpoints define a relative meter; this does not establish absolute
+volumetric water content or calibrated soil-moisture accuracy.
 
 ## 2.0.0-rebuild.6 — compact zone dashboard
 
