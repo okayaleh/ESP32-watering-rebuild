@@ -2,7 +2,7 @@
 
 ## 2.0.0-rebuild.7 — explicit sensor inputs and fresh readings
 
-Prepublication checks on **2026-09-13** cover physical ADS1115 input labels,
+Validation on **2026-09-13** covers physical ADS1115 input labels,
 unused-input selection for new zones, shared-input warnings and invalidation
 of stale samples after sensor reconfiguration. The native platform and boot
 helpers are unchanged.
@@ -33,8 +33,41 @@ and no ADC hardware fault has been established. Empty analog inputs are not
 valid probe measurements; raw values and a percentage alone do not identify
 an unplugged probe.
 
-At this checkpoint, publication and physical .7 deployment have not been
-recorded. Earlier release evidence below retains its original scope.
+### Published .7 release and board acceptance
+
+All three GitHub validation/publication workflow runs succeeded at commit
+`1ad7801e281f1ad9b07a756728f97ed0c57a871b`.
+[Version .7](https://github.com/okayaleh/ESP32-watering-rebuild/releases/tag/v2.0.0-rebuild.7)
+was published on September 13 at 15:13:45 UTC. The verified standalone
+channel retains .7, .6 and .5.
+
+The real ESP32 installed .7 directly from GitHub over HTTPS, upgrading from
+.6, then restarted and rejoined Wi-Fi. Before/after OTA configuration exports
+were identical, including the corrected channel 0/1/2 assignments and the
+unchanged 17,500 dry / 8,000 wet calibration. A read-only status check reported
+121 seconds uptime, three zones, all software-controlled valve outputs closed
+and no safety fault. The startup update check at approximately 60 seconds
+completed with the application up to date. One read timeout during the
+installation/reboot recovered afterward.
+
+The served 78,632-byte dashboard exactly matched the release, with SHA-256
+`e0391e1e5d4a753b524e5a752786aaee0555119a652b518ad88b4c1f632de58c`.
+Real Chrome loaded the board's dashboard at 1280×900 and 390×844 in light
+and dark modes. All four views showed three zone panels, no horizontal
+overflow and no page JavaScript errors. Document height was 992 pixels on
+desktop and 1,813 pixels on mobile. Status was online, all reported outputs
+were closed and Maintenance navigation exposed **Check for updates**.
+
+The inspected board screenshot showed the corrected A0/A1/A2 labels. Its
+readings were raw 21,563 / 0% on zone 1/A0, 7,340 / 100% on zone 2/A1 and
+7,343 / 100% on zone 3/A2. These establish distinct reported ADC readings
+under the retained generic calibration; the physical dry/wet state of the
+inputs was not confirmed, so they do not establish probe accuracy.
+
+These observations establish deployment and preserved configuration. No
+physical dry/wet calibration, probe-accuracy measurement or physical ADC
+multiplexer acceptance has been completed in this investigation. Earlier
+release evidence below retains its original scope.
 
 ## 2.0.0-rebuild.6 — compact zone dashboard
 
