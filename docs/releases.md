@@ -3,6 +3,30 @@
 [Documents](README.md) · [Updates and rollback](ota.md) ·
 [All GitHub releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases)
 
+## 2.0.0-rebuild.8 — measured or entered calibration limits
+
+- Each zone panel displays editable **Dry raw · 0%** and **Wet raw · 100%**
+  limits beside the existing **Capture dry** and **Capture wet** controls.
+  Enter known endpoints and choose **Save limits**, or measure a reference
+  using the roughly ten-second capture that saves its endpoint automatically.
+- Dashboard polling preserves unsaved raw-value drafts. A successful capture
+  updates the captured endpoint's field and preserves a draft in the other
+  field; it does not silently save that other draft.
+- A targeted manual calibration API saves both endpoints for one zone.
+  It requires whole-number raw counts from 0 to 32,767, with at least 100
+  counts between dry and wet. The existing measured-capture API is retained.
+- The dial and moisture watering use the same saved calibration whichever
+  entry method you choose. Percentages remain relative to those references,
+  not measured volumetric soil water content.
+
+Existing zone mappings, calibration and garden settings are preserved by OTA.
+This update does not change sensor wiring, ADC gain or supply voltage. The
+native platform and boot helpers are unchanged. Install using the standalone
+GitHub updater; .7 and .6 remain compatible retained releases. See the
+[API reference](api.md#moisture-calibration),
+[calibration troubleshooting](troubleshooting.md#moisture-stays-at-0-or-100-or-several-zones-read-alike)
+and [validation report](validation.md) for behavior and recorded checks.
+
 ## 2.0.0-rebuild.7 — explicit sensor inputs and fresh readings
 
 - **Add zone** selects the first unused input on the configured ADS1115 boards

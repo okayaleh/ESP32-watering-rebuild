@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-rebuild.7",
+  "version": "2.0.0-rebuild.8",
   "mpy": "6.3",
   "files": [
     {
@@ -11,14 +11,14 @@
     {
       "name": "api.mpy",
       "path": "build/api.mpy",
-      "size": 4669,
-      "sha256": "0c914ba6b0294e974dab19c64a6adaca538ba7c1fe7d83a2b021e2b6f22a95f5"
+      "size": 4960,
+      "sha256": "fe11e2c054d6cfab2bba62732dcdea131d7bfdf604ceb14c156b1e7f67214a05"
     },
     {
       "name": "application.mpy",
       "path": "build/application.mpy",
-      "size": 6856,
-      "sha256": "ec76998a021c0907b66f8939cf8f93c844f3595cfbf75e80a7d8d76a015594cf"
+      "size": 7072,
+      "sha256": "2ab5cad8eff3647d52ede954c55780af355b65aaaad14770be1291ff16e872b8"
     },
     {
       "name": "compat.mpy",
@@ -119,20 +119,20 @@
     {
       "name": "index.html",
       "path": "build/index.html",
-      "size": 78632,
-      "sha256": "e0391e1e5d4a753b524e5a752786aaee0555119a652b518ad88b4c1f632de58c"
+      "size": 82444,
+      "sha256": "0d7602b18d629cba4983235a185479e6155a311229b864b6478cbf5399ea08ee"
     },
     {
       "name": "index.html.gz",
       "path": "build/index.html.gz",
-      "size": 23255,
-      "sha256": "d50cd5d31728d45f04b1471767ddcbf05e88a81abec611086db60377b393d082"
+      "size": 24244,
+      "sha256": "b987aadcd0177dd5119644b2c705280e6eb5cdd7d672e211729237aa8518692a"
     },
     {
       "name": "version.json",
       "path": "build/version.json",
       "size": 31,
-      "sha256": "0948cb86bca7a059a40244a4f6ca23d2318ad3168c98b76266770b3dc49f2827"
+      "sha256": "ee979148c883024786ab6a0b6373d7672d654ed114ec91348ce2bd728a98f25d"
     }
   ],
   "platform": "planter-esp32-romfs-mpy6",

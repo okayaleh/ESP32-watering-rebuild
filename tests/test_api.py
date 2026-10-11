@@ -174,6 +174,29 @@ class APIContractTests(unittest.TestCase):
         self.assertEqual(result, {"ok": True})
         self.assertEqual(self.app.calls, [("calibration", ({"zone": "Jardín", "point": "wet"},), {})])
 
+    def test_manual_calibration_routes_both_raw_limits_for_either_polarity(self):
+        for dry, wet in ((21567, 7645), (0, 100), (32767, 32667)):
+            body = {"zone": "bed", "dry_raw": dry, "wet_raw": wet}
+            self.assertEqual(self.call("/api/calibrate", body=body), {"ok": True})
+            self.assertEqual(self.app.calls[-1], ("calibration", (body,), {}))
+
+    def test_invalid_manual_calibration_never_reaches_application(self):
+        good = {"zone": "bed", "dry_raw": 20000, "wet_raw": 8000}
+        invalid = [
+            {"zone": "bed", "dry_raw": 20000},
+            {"zone": "bed", "wet_raw": 8000},
+            {"dry_raw": 20000, "wet_raw": 8000},
+            dict(good, point="dry"), dict(good, point=None),
+            dict(good, dry_raw=8050), dict(good, dry_raw=8000),
+        ]
+        for key in ("dry_raw", "wet_raw"):
+            for value in (None, True, False, "20000", "", 20000.0, 1.5, -1, 32768, [], {}):
+                invalid.append(dict(good, **{key: value}))
+        for body in invalid:
+            with self.subTest(body=body):
+                self.assert_error(self.call("/api/calibrate", body=body), 400)
+        self.assertEqual(self.app.calls, [])
+
     def test_save_and_update_facade_routing(self):
         cases = [
             ("settings", {"daily_enabled": False}, "save_settings"),

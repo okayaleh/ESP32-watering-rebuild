@@ -230,6 +230,24 @@ class Application:
         return {"found": self.sensors.found, "busy": True}
 
     def calibration(self, body=None):
+        if body is not None and ("dry_raw" in body or "wet_raw" in body):
+            if "point" in body or "dry_raw" not in body or "wet_raw" not in body:
+                raise ValueError("Provide both raw limits without a capture point")
+            zone = body.get("zone")
+            if zone not in self.settings["hardware"]["zone_channels"]:
+                raise ValueError("Unknown zone")
+            # Merge only the named zone into the latest saved configuration.
+            # The shared save path validates, rejects an active capture, writes
+            # atomically, and invalidates readings made with the old limits.
+            candidate = clone(self.settings)
+            candidate["hardware"]["zone_calibration"][zone] = {
+                "dry_raw": body["dry_raw"], "wet_raw": body["wet_raw"]}
+            self._save(candidate)
+            self.calibration_before = None
+            if self.sensors:
+                self.sensors.calibration_result = None
+            return {"busy": False, "result": None,
+                    "calibration": self.settings["hardware"]["zone_calibration"]}
         if not self.sensors:
             raise RuntimeError("I2C unavailable")
         if body is not None:

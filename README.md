@@ -6,7 +6,7 @@ A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.
 
 ## Project status
 
-The current application is **2.0.0-rebuild.7**, a **prerelease** that makes each zone's physical ADS1115 input explicit, chooses the first unused configured input for new zones and clears old readings when sensor configuration changes. The compact dashboard, sunset-to-sky background, sand-colored panels and dark mode remain included, alongside independent GitHub updates, automatic idle-time installation, retained compatible releases and GPIO2 RGB status colors. See the [release notes](docs/releases.md) for changes and upgrade compatibility. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
+The current application is **2.0.0-rebuild.8**, a **prerelease** that lets you measure or directly enter each zone's dry and wet raw ADC limits in its dashboard panel. The physical ADS1115 input labels, compact dashboard, sunset-to-sky background, sand-colored panels and dark mode remain included, alongside independent GitHub updates, automatic idle-time installation, retained compatible releases and GPIO2 RGB status colors. See the [release notes](docs/releases.md) for changes and upgrade compatibility. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
 The previous application, **2.0.0-rebuild.2**, was installed on a classic ESP32-D0WD-V3 with 4 MB flash. Its validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. That bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**. Current release checks and the distinction from earlier hardware measurements are recorded in the [validation report](docs/validation.md).
 
@@ -17,7 +17,7 @@ The installed bench board has both automatic watering modes disabled. **Fresh ap
 | Area | Included behavior |
 | --- | --- |
 | Watering | Up to 8 valves, 16 zones and 20 daily schedules; one valve runs at a time, including manual, zone and all-valve batches |
-| Moisture control | Per-zone calibration, dry threshold, wet target, duration and valve mappings; bounded soak/recheck cycles and per-valve cooldowns |
+| Moisture control | Per-zone measured or manually entered dry/wet calibration, dry threshold, wet target, duration and valve mappings; bounded soak/recheck cycles and per-valve cooldowns |
 | Output supervision | Closure at boot, monotonic deadlines, hard maximum run duration, startup grace, hardware watchdog and persistent watering intent |
 | Schedule persistence | Occurrences recorded before activation to prevent duplicate starts after resets or backward clock changes |
 | Sensors | Up to 4 ADS1115 boards on one I2C bus; optional AHT20, BMP280 and digital rain indication; bounded reads and bus recovery |
@@ -96,6 +96,15 @@ dry/wet calibration, not a measurement of volumetric soil water content. See
 [sensor mapping and calibration troubleshooting](docs/troubleshooting.md#moisture-stays-at-0-or-100-or-several-zones-read-alike)
 before calibrating a new probe or interpreting an empty input.
 
+Each panel shows **Dry raw · 0%** and **Wet raw · 100%**. You can type known
+raw ADC values into these fields and choose **Save limits**, or hold the probe
+in a known reference and choose **Capture dry** or **Capture wet**. A capture
+averages about ten seconds and automatically saves that endpoint when it
+succeeds. Typed values remain drafts until **Save limits** saves the pair;
+normal dashboard refreshes preserve those drafts. Use whole numbers from
+0 to 32,767, with at least 100 counts between the dry and wet limits. Both
+methods set the same saved calibration used by the dial and moisture watering.
+
 Use the **Dark mode** toggle in the dashboard header to change appearance. On
 first visit, the dashboard follows the browser's system color preference; an
 explicit choice is remembered in that browser. Theme changes do not change
@@ -135,7 +144,7 @@ Use Python 3.10+ and Node.js 22+. From a new checkout:
 git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
 cd ESP32-watering-rebuild
 python -m pip install -r requirements-dev.txt
-python tools/build.py --version 2.0.0-rebuild.7
+python tools/build.py --version 2.0.0-rebuild.8
 python tools/check.py
 ```
 

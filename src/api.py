@@ -186,9 +186,21 @@ class APIRouter:
         elif path == "/api/calibrate":
             value = _object(body)
             zone = _name(value.get("zone"), required=True)
-            if value.get("point") not in ("dry", "wet"):
-                raise ValueError("Calibration point must be dry or wet")
-            result = app.calibration({"zone": zone, "point": value["point"]})
+            if "dry_raw" in value or "wet_raw" in value:
+                if "point" in value or "dry_raw" not in value or "wet_raw" not in value:
+                    raise ValueError("Provide both raw limits without a capture point")
+                limits = {"zone": zone}
+                for key in ("dry_raw", "wet_raw"):
+                    if isinstance(value[key], bool) or not isinstance(value[key], int):
+                        raise ValueError(key + " must be an integer")
+                    limits[key] = _integer(value[key], key, 0, 32767)
+                if abs(limits["dry_raw"] - limits["wet_raw"]) < 100:
+                    raise ValueError("Dry and wet calibration must differ by at least 100")
+                result = app.calibration(limits)
+            else:
+                if value.get("point") not in ("dry", "wet"):
+                    raise ValueError("Calibration point must be dry or wet")
+                result = app.calibration({"zone": zone, "point": value["point"]})
         elif path == "/api/valve":
             name = _name(query.get("valve"))
             state = query.get("state")

@@ -1,5 +1,21 @@
 # Validation report
 
+## 2.0.0-rebuild.8 — measured or entered raw limits
+
+Validation on **2026-10-11** covers the visible per-zone raw-limit fields,
+targeted manual calibration saves and coexistence with measured capture.
+
+| Check | Result and scope |
+| --- | --- |
+| Host suite | All 242 tests passed in 20.496 seconds, with Python compilation and dashboard JavaScript syntax checks. New API/persistence cases cover strict integer limits, minimum span, either polarity, active capture rejection, unrelated-settings preservation, restart persistence, storage failure and manual entry without I2C. |
+| Dashboard DOM audit | All 70 named checks passed. New coverage includes targeted saves, invalid entries without requests, preserved drafts/focus, save failures, busy controls, capture updating only its endpoint, and protection against an old zone-editor value overwriting a newly saved calibration. |
+| Real Chrome layout | At 1280, 390 and 320 pixels wide, light and dark views had no horizontal overflow or page JavaScript errors. Expanded configuration and long-name/multiple-valve fixtures also fit. Screenshots were inspected. |
+| Browser/API integration | In the desktop simulator, a real browser saved a pair of raw limits, confirmed only that zone's endpoints changed, reloaded the saved values, retained a draft during refresh, and rejected a span below 100 without changing settings. Test values were restored afterward. |
+| Application artifacts | 22 OTA files; dashboard HTML 82,444 bytes and gzip 24,244 bytes. Platform firmware and boot helpers are unchanged. |
+
+These host and simulator checks do not establish sensor accuracy or physical
+reference conditions. No new dry/wet reference was measured for this change.
+
 ## 2.0.0-rebuild.7 — explicit sensor inputs and fresh readings
 
 Validation on **2026-09-13** covers physical ADS1115 input labels,

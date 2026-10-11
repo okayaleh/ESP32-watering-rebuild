@@ -220,13 +220,33 @@ measurement is intentional.
    [floating-input measurements have no useful meaning](https://e2e.ti.com/support/data-converters-group/data-converters/f/data-converters-forum/447745/ads1115-input-channels-are-influence-each-other).
    Neither a successful I2C scan nor a plausible percentage detects an
    unplugged probe.
-4. Calibrate only after the connected probe has settled in each known
-   reference. Use **Capture dry**, then move to the wet reference and use
-   **Capture wet**, keeping the probe electronics dry. Each capture averages
-   about ten seconds and saves the endpoint when it succeeds. Review the
-   reported sample spread and repeat after settling if it is unstable. Do
-   not capture an empty input or assume the current probe position is a known
-   dry/wet reference.
+4. Choose how to set that probe's dry and wet references in its zone panel:
+   **Capture dry** and **Capture wet** measure the connected probe;
+   **Dry raw · 0%**, **Wet raw · 100%** and **Save limits** let you enter
+   known raw ADC values directly. The manual fields are available from .8.
+
+For a measurement, wait for the connected probe to settle in a known dry
+reference, choose **Capture dry**, then repeat with the wet reference and
+**Capture wet**, keeping the probe electronics dry. Each capture averages
+about ten seconds and automatically saves its endpoint when it succeeds.
+Review the reported sample spread and repeat after settling if it is
+unstable. Do not capture an empty input or assume the current probe position
+is a known dry/wet reference.
+
+For manual entry, type both reference values and choose **Save limits**.
+Each must be a whole number from 0 to 32,767, with at least 100 counts between
+the pair. A sensor whose raw reading falls as moisture rises has a higher
+dry value than wet value; the reverse polarity is supported too. Enter raw
+ADC counts, not percentages or voltages. Until the save succeeds, the dial
+and automatic watering continue to use the saved endpoints. Normal dashboard
+refreshes preserve your typed drafts. A successful capture updates its own
+field while preserving an unsaved draft in the other field; capture does not
+automatically save that other draft.
+
+Both methods change the same calibration. Use references appropriate to the
+probe and growing medium, with consistent insertion depth and soil contact.
+Air and water references characterize the probe's electrical range; their
+percentage scale does not directly measure the water content of your soil.
 
 The generic endpoints are raw **17,500 dry** and **8,000 wet**. With those
 defaults, raw **7,333** clamps to **100%**, and **21,561** clamps to **0%**.

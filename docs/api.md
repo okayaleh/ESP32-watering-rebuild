@@ -21,7 +21,7 @@ The public API retains the original routes below. JSON is UTF-8 and responses cl
 | `/api/hardware` | GET hardware; POST `{hardware:{...}}`; reboot |
 | `/api/pinmap` | GET board-specific GPIO roles/safety and ADC assignments |
 | `/api/i2c/scan` | GET queues scan; poll until `busy:false` for completed result |
-| `/api/calibrate` | POST `{zone,point:"dry"|"wet"}`; GET `{busy,result,calibration}` |
+| `/api/calibrate` | POST measured `{zone,point:"dry"}` (or `"wet"`) or manual `{zone,dry_raw,wet_raw}`; GET `{busy,result,calibration}` |
 | `/api/config/export` | GET downloadable runtime settings, no credentials |
 | `/api/config/import` | POST validated full configuration; save then reboot |
 | `/api/wifi` | GET SSID/state without password; POST `{ssid,password}` or setup form; save/readback/reboot |
@@ -35,6 +35,43 @@ Schedule: `{id,hour,minute,duration_sec,enabled,valve_names:[],zone_names:[]}`. 
 Names allow48 UTF-8 bytes. Maximum8 valves,16 zones,4 ADC boards and20 schedules; requests remain limited to16KiB, so a very large import/list must fit that byte limit. GPIO assignments must satisfy the selected board profile and cannot collide. Wet target must exceed dry threshold. Durations cannot exceed the local hard cutoff.
 
 Compared with the old server, update checks are queued rather than blocking a request, code uploads require explicit apply, history timestamps are consistently Unix seconds, pin-map/status diagnostics are richer, and startup grace also blocks manual opens. API access is unauthenticated like the original; keep the controller on a trusted LAN.
+
+## Moisture calibration
+
+Both calibration methods use `POST /api/calibrate` and update the same saved
+zone endpoints used for moisture percentages and automatic watering.
+
+To measure a reference, send:
+
+```json
+{"zone":"zone1","point":"dry"}
+```
+
+Use `"wet"` for the wet reference. Hold the connected probe steadily in the
+known reference throughout the roughly ten-second capture. Poll
+`GET /api/calibrate` until it is no longer busy and inspect the result. A
+successful capture automatically saves the measured endpoint; it does not
+require a separate manual save.
+
+From .8, to enter known raw ADC limits instead, send both endpoints without
+`point`:
+
+```json
+{"zone":"zone1","dry_raw":21567,"wet_raw":7645}
+```
+
+These example values are not universal sensor defaults. Both fields must be
+JSON integers from 0 to 32,767, separated by at least 100 counts. Strings,
+booleans, fractions, a missing endpoint, an out-of-range value, or mixing
+manual fields with `point` are rejected. Either sensor polarity is supported.
+The pair is validated and saved together for the named zone; a rejected
+request leaves its saved limits unchanged.
+
+In the dashboard, typed endpoints stay local until **Save limits** is clicked.
+Regular polling preserves unsaved edits. A successful **Capture dry** or
+**Capture wet** updates its own endpoint field while preserving an unsaved
+draft in the other field. Capture does not apply that other draft. These
+endpoints define a relative dry-to-wet scale, not volumetric soil water content.
 
 ## Update status and version selection
 

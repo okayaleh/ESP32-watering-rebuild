@@ -167,6 +167,74 @@ class SettingsStateTests(unittest.TestCase):
             with self.assertRaises(OSError): self.app.commit_calibration()
         self.assertEqual(self.app.settings["hardware"]["zone_calibration"]["zone1"], previous)
         self.assertIn("error", sensor.calibration_result)
+
+    def test_manual_calibration_only_changes_named_zone_and_reconfigures_readings(self):
+        self.app.save_zones({"zones": [{"name": "zone1", "channel": 0, "threshold": 30},
+                                       {"name": "other", "channel": 1, "threshold": 30}]})
+        expected = clone(self.app.settings)
+        configured = []
+        sensor = SimpleNamespace(calibration=None, configure=configured.append,
+                                 calibration_result={"zone": "zone1", "point": "dry", "raw": 17500})
+        self.app.sensors = sensor
+        body = {"zone": "zone1", "dry_raw": 21567, "wet_raw": 7645}
+        result = self.app.calibration(body)
+        expected["hardware"]["zone_calibration"]["zone1"] = {"dry_raw": 21567, "wet_raw": 7645}
+        self.assertEqual(self.app.settings, expected)
+        self.assertEqual(read_json(self.path), expected)
+        self.assertEqual(SettingsStore(self.config, self.path).data, expected)
+        self.assertEqual(configured, [self.app.settings])
+        self.assertIsNone(sensor.calibration_result)
+        self.assertEqual(result, {"busy": False, "result": None,
+                                  "calibration": expected["hardware"]["zone_calibration"]})
+        body["dry_raw"] = 0
+        self.assertEqual(self.app.settings["hardware"]["zone_calibration"]["zone1"]["dry_raw"], 21567)
+
+    def test_manual_calibration_accepts_either_polarity_without_connected_sensor(self):
+        self.assertIsNone(self.app.sensors)
+        for dry, wet in ((0, 100), (32767, 32667)):
+            result = self.app.calibration({"zone": "zone1", "dry_raw": dry, "wet_raw": wet})
+            self.assertEqual(result["calibration"]["zone1"], {"dry_raw": dry, "wet_raw": wet})
+
+    def test_manual_calibration_rejection_preserves_saved_and_live_state(self):
+        before = clone(self.app.settings)
+        before_disk = Path(self.path).read_bytes() if Path(self.path).exists() else None
+        for body in ({"zone": "missing", "dry_raw": 20000, "wet_raw": 8000},
+                     {"zone": "zone1", "dry_raw": 20000},
+                     {"zone": "zone1", "dry_raw": 20000, "wet_raw": 8000, "point": "wet"},
+                     {"zone": "zone1", "dry_raw": True, "wet_raw": 8000},
+                     {"zone": "zone1", "dry_raw": 8001, "wet_raw": 8000}):
+            with self.subTest(body=body):
+                with self.assertRaises(ValueError): self.app.calibration(body)
+                self.assertEqual(self.app.settings, before)
+                self.assertEqual(Path(self.path).read_bytes() if Path(self.path).exists() else None, before_disk)
+        configured = []
+        capture = {"zone": "zone1", "point": "dry"}
+        old_result = {"raw": 17500}
+        self.app.sensors = SimpleNamespace(calibration=capture, configure=configured.append,
+                                          calibration_result=old_result)
+        with self.assertRaisesRegex(RuntimeError, "Finish calibration"):
+            self.app.calibration({"zone": "zone1", "dry_raw": 20000, "wet_raw": 8000})
+        self.assertEqual(self.app.settings, before)
+        self.assertEqual(configured, [])
+        self.assertIs(self.app.sensors.calibration, capture)
+        self.assertIs(self.app.sensors.calibration_result, old_result)
+
+    def test_failed_manual_calibration_save_retains_previous_limits_and_result(self):
+        self.app.save_settings({"daily_enabled": False})
+        before = clone(self.app.settings)
+        before_disk = Path(self.path).read_bytes()
+        configured = []
+        old_result = {"raw": 17500}
+        self.app.sensors = SimpleNamespace(calibration=None, configure=configured.append,
+                                          calibration_result=old_result)
+        with patch.object(self.store, "save_owned", side_effect=OSError("disk full")):
+            with self.assertRaises(OSError):
+                self.app.calibration({"zone": "zone1", "dry_raw": 20000, "wet_raw": 8000})
+        self.assertEqual(self.app.settings, before)
+        self.assertEqual(Path(self.path).read_bytes(), before_disk)
+        self.assertEqual(configured, [])
+        self.assertIs(self.app.sensors.calibration_result, old_result)
+
     def test_unknown_and_credential_fields_rejected(self):
         for key in ("wifi_password", "password", "wifi", "unexpected"):
             value = clone(self.store.data)

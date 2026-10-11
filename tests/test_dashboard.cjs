@@ -188,6 +188,73 @@ async function auditCompactZones(){
     document.activeElement=null;
   }
 }
+async function auditManualLimits(){
+  const snapshot=await run('({zones:model.zones,valves:model.valves,status:model.status,settings:model.settings,calibrating:model.calibrating,calibrationSaving:model.calibrationSaving,captureZone:model.captureZone,capturePoint:model.capturePoint,calibrationData:model.calibrationData})');
+  sandbox.manualFixture=[{name:'Dry & wet / bed',channel:0,valves:[],dry_raw:21567,wet_raw:7645,threshold:30,wet_target:60},{name:'Other bed',channel:1,valves:[],dry_raw:21000,wet_raw:7500,threshold:30,wet_target:60}];
+  await run('globalThis.savedManualPost=post;globalThis.savedManualRequest=request;globalThis.manualActions=[];globalThis.manualFail=false;globalThis.manualResponse={busy:false,result:null,calibration:Object.fromEntries(manualFixture.map(zone=>[zone.name,{dry_raw:zone.dry_raw,wet_raw:zone.wet_raw}]))};post=async(path,body)=>{manualActions.push({path,body});if(manualFail)throw new Error("Injected calibration save failure");if("point" in body)return {busy:true};manualResponse={busy:false,result:null,calibration:{...manualResponse.calibration,[body.zone]:{dry_raw:body.dry_raw,wet_raw:body.wet_raw}}};return manualResponse;};request=async(path,...args)=>path==="/api/calibrate"?manualResponse:savedManualRequest(path,...args);model.settings=JSON.parse(JSON.stringify(model.settings));model.zones=manualFixture;model.valves=[];model.status={moisture:[],valves:{}};model.calibrating=false;model.calibrationSaving=false;model.captureZone=null;model.capturePoint=null;model.calibrationData=null;renderZones();renderLive();renderStatus();say("");');
+  try{
+    let first=await run('model.zoneNodes.get(manualFixture[0].name)'),other=await run('model.zoneNodes.get(manualFixture[1].name)');
+    const editor=await run('zoneRows[0]');
+    assert.equal(first.dryRaw.value,'21567');assert.equal(first.wetRaw.value,'7645');
+    assert.match(first.dryRaw.getAttribute('aria-label'),/dry raw.*0 percent/);assert.match(first.wetRaw.getAttribute('aria-label'),/wet raw.*100 percent/);
+    for(const field of [first.dryRaw,first.wetRaw]){assert.equal(field.min,'0');assert.equal(field.max,'32767');assert.equal(field.step,'1');}
+    first.dryRaw.value='22500';first.wetRaw.value='7000';first.dryRaw.focus();
+    await run('renderStatus();loadCalibration()');
+    assert.equal(first.dryRaw.value,'22500');assert.equal(first.wetRaw.value,'7000');assert.equal(document.activeElement,first.dryRaw);
+    await run('renderLive();renderStatus()');first=await run('model.zoneNodes.get(manualFixture[0].name)');other=await run('model.zoneNodes.get(manualFixture[1].name)');
+    assert.equal(first.dryRaw.value,'22500');assert.equal(first.wetRaw.value,'7000','Both raw drafts survive a configuration display rebuild');
+    ids.get('calibration-zone').value='Other bed';
+    await clickElement(first.saveLimits);
+    let action=await run('manualActions.at(-1)');assert.equal(action.path,'/api/calibrate');assert.deepEqual({...action.body},{zone:'Dry & wet / bed',dry_raw:22500,wet_raw:7000});
+    assert.equal(first.drySaved,22500);assert.equal(first.wetSaved,7000);assert.equal(other.dryRaw.value,'21000');assert.equal(other.wetRaw.value,'7500');
+    assert.match(first.calibration.textContent,/Saved/);assert.doesNotMatch(first.calibration.textContent,/captured/);
+    assert.equal(editor.dryRaw.value,'22500');assert.equal(editor.wetRaw.value,'7000');
+    assert.equal('dry_raw' in editor.read(),false);assert.equal('wet_raw' in editor.read(),false,'An unrelated zone edit cannot reapply old limits after a manual save');
+    const beforeInvalid=await run('manualActions.length');
+    for(const [dry,wet,message] of [['','7000',/whole number/],['  ','7000',/whole number/],['-1','7000',/whole number/],['32768','7000',/whole number/],['22500','1.5',/whole number/],['22500','NaN',/whole number/],['7000','7000',/at least 100/],['7099','7000',/at least 100/]]){
+      first.dryRaw.value=dry;first.wetRaw.value=wet;
+      await assert.rejects(run('saveRawLimits(manualFixture[0].name)'),message);
+    }
+    assert.equal(await run('manualActions.length'),beforeInvalid,'Invalid values never reach the controller');
+    first.dryRaw.value='0';first.wetRaw.value='100';await clickElement(first.saveLimits);
+    assert.deepEqual({...((await run('manualActions.at(-1)')).body)},{zone:'Dry & wet / bed',dry_raw:0,wet_raw:100},'Zero and reverse polarity are valid with sufficient separation');
+    first.dryRaw.value='32767';first.wetRaw.value='32667';await clickElement(first.saveLimits);
+    assert.equal(first.drySaved,32767);assert.equal(first.wetSaved,32667);
+
+    // A rejected save must preserve the draft and baseline and re-enable controls.
+    first.dryRaw.value='22000';first.wetRaw.value='8000';await run('manualFail=true');
+    await assert.rejects(run('saveRawLimits(manualFixture[0].name)'),/Injected calibration save failure/);
+    assert.equal(first.dryRaw.value,'22000');assert.equal(first.wetRaw.value,'8000');assert.equal(first.drySaved,32767);assert.equal(first.wetSaved,32667);
+    assert.equal(await run('model.calibrationSaving'),false);assert.equal(first.saveLimits.disabled,false);assert.equal(other.captureDry.disabled,false);await run('manualFail=false');
+    await clickElement(first.saveLimits);
+
+    // While a request is in flight, all zones share the calibration lock.
+    await run('globalThis.unblockedManualPost=post;globalThis.releaseManualSave=null;post=async(path,body)=>{await new Promise(resolve=>releaseManualSave=resolve);return unblockedManualPost(path,body);};');
+    first.dryRaw.value='23000';const saving=run('saveRawLimits(manualFixture[0].name)');
+    assert.equal(await run('model.calibrationSaving'),true);
+    for(const refs of [first,other])for(const field of [refs.dryRaw,refs.wetRaw,refs.saveLimits,refs.captureDry,refs.captureWet])assert.equal(field.disabled,true);
+    await assert.rejects(run('captureZone(manualFixture[1].name,"wet")'),/Wait for the current calibration/);
+    await run('releaseManualSave()');await saving;await run('post=unblockedManualPost');
+    for(const refs of [first,other])assert.equal(refs.saveLimits.disabled,false);
+
+    // A capture overwrites its own endpoint draft, while retaining an independently
+    // edited opposite limit. Editor drafts remain explicit edits against fresh baselines.
+    first.dryRaw.value='24000';first.wetRaw.value='9000';editor.wetRaw.value='9200';
+    await run('manualResponse={...manualResponse,busy:true,result:null}');await clickElement(first.captureDry);
+    assert.deepEqual({...((await run('manualActions.at(-1)')).body)},{zone:'Dry & wet / bed',point:'dry'});
+    for(const refs of [first,other])for(const field of [refs.dryRaw,refs.wetRaw,refs.saveLimits,refs.captureDry,refs.captureWet])assert.equal(field.disabled,true);
+    const beforeBusySave=await run('manualActions.length');await assert.rejects(run('saveRawLimits(manualFixture[1].name)'),/Wait for the current calibration/);assert.equal(await run('manualActions.length'),beforeBusySave);
+    await run('manualResponse={busy:false,result:{zone:manualFixture[0].name,point:"dry",raw:23500,samples:19,spread_raw:3},calibration:{...manualResponse.calibration,[manualFixture[0].name]:{dry_raw:23500,wet_raw:8000}}};loadCalibration()');
+    assert.equal(first.dryRaw.value,'23500');assert.equal(first.wetRaw.value,'9000');assert.equal(first.drySaved,23500);assert.equal(first.wetSaved,8000);
+    assert.equal(editor.dryRaw.value,'23500');assert.equal(editor.wetRaw.value,'9200');assert.equal(editor.wetSaved,8000);
+    assert.equal('dry_raw' in editor.read(),false);assert.equal(editor.read().wet_raw,9200,'Intentional editor draft survives new capture endpoints');
+    first.dryRaw.value='25000';await run('loadCalibration()');assert.equal(first.dryRaw.value,'25000','Repeated old capture results must not overwrite a later draft');
+    await clickElement(first.saveLimits);assert.equal(first.drySaved,25000);assert.equal(first.wetSaved,9000);assert.match(first.calibration.textContent,/Saved/);assert.doesNotMatch(first.calibration.textContent,/captured/);
+    assert.equal(editor.wetSaved,9000);assert.equal(editor.wetRaw.value,'9200');assert.equal('dry_raw' in editor.read(),false);
+  }finally{
+    sandbox.manualRestore=snapshot;await run('post=savedManualPost;request=savedManualRequest;Object.assign(model,manualRestore);renderZones();renderLive();renderStatus();say("");');document.activeElement=null;
+  }
+}
 (async()=>{
   for(const script of scripts)await run(script);
   assert.match(ids.get('connection').textContent,/online/);
@@ -251,6 +318,8 @@ async function auditCompactZones(){
     }finally{await run('post=savedUpdatePost');sandbox.restoredUpdateStatus=JSON.parse(originalStatus);await run('model.status=restoredUpdateStatus;renderUpdate()');}
     await auditSensorAssignments();
     await auditCompactZones();
+    await auditManualLimits();
+    console.log(JSON.stringify({manualCalibration:'passed',checks:['visible raw fields and accessible labels','raw drafts and focus survive polling','raw drafts survive display rebuild','manual save targets its own zone','integer range and minimum span prevent requests','zero and either polarity accepted','failed save preserves drafts and saved values','pending save and capture lock every zone','captured endpoint replaces only its own draft','zone editor tracks fresh saved baselines','repeated capture result preserves subsequent draft']},null,2));
     // The request queue must survive a rejection and serialize simultaneous jobs.
     failNext=true;
     await run("Promise.allSettled([request('/api/status'),request('/api/settings'),request('/api/events')])");
