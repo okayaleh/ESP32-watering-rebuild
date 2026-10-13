@@ -3,6 +3,13 @@
   "repository": "okayaleh/ESP32-watering-rebuild",
   "releases": [
     {
+      "version": "2.0.0-rebuild.9",
+      "commit": "f408cef57c0659c446aed02002baa8eed1d8d862",
+      "manifest_sha256": "7998358d1b8f35cd541202b194aa5fdef2b2fb5aeacc412ec237c8f991aafb32",
+      "manifest_size": 4186,
+      "published_at": "2026-10-13T22:50:18Z"
+    },
+    {
       "version": "2.0.0-rebuild.8",
       "commit": "5392813ef26cb541a5a83fa9e7ce5c55ad38f5e8",
       "manifest_sha256": "e5d3d3b8e24221a9ff05b0545e50f0a30ac62c0cb01b23fabc973f3c27c04c63",
@@ -15,13 +22,6 @@
       "manifest_sha256": "f0d17a9f97523f8b462b95f42b8983de78ee9df057e8f5d685b1ba7d45070387",
       "manifest_size": 4186,
       "published_at": "2026-09-13T15:13:45Z"
-    },
-    {
-      "version": "2.0.0-rebuild.6",
-      "commit": "d7e3d3d0468819c8c7b9adbaec464cd5da541c30",
-      "manifest_sha256": "ad2b35d3f345ba178d0e3826e794ef9fe499714c5c3cd1d9280d295d890ab0e6",
-      "manifest_size": 4186,
-      "published_at": "2026-09-09T22:58:57Z"
     }
   ]
 }
