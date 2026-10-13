@@ -6,7 +6,7 @@ A ground-up MicroPython rebuild of [supercrossed/ESP32-watering](https://github.
 
 ## Project status
 
-The current application is **2.0.0-rebuild.8**, a **prerelease** that lets you measure or directly enter each zone's dry and wet raw ADC limits in its dashboard panel. The physical ADS1115 input labels, compact dashboard, sunset-to-sky background, sand-colored panels and dark mode remain included, alongside independent GitHub updates, automatic idle-time installation, retained compatible releases and GPIO2 RGB status colors. See the [release notes](docs/releases.md) for changes and upgrade compatibility. The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
+The current application is **2.0.0-rebuild.9**, a **prerelease** with an always-visible **At the planter** panel for AHT20/BMP280 air temperature, humidity and pressure. It adds clearer unavailable/error states and recovery from disconnected environmental sensors. The compact zone panels retain measured or manually entered dry/wet limits, dark mode, independent GitHub updates, retained compatible releases and GPIO2 RGB status colors. See the [release notes](docs/releases.md) and the [environment sensor wiring guide](docs/environment-sensor.md). The custom MicroPython 1.28.0 platform keeps application bytecode in flash and preserves native networking allocation headroom.
 
 The previous application, **2.0.0-rebuild.2**, was installed on a classic ESP32-D0WD-V3 with 4 MB flash. Its validation includes 190 host tests, 83 verified HTTP responses under maximum configuration, a settings save under load, GPIO timing, watchdog reset, ROM cache recovery and production startup. That bench board joined a home Google mesh network, synchronized its clock and completed a short LAN check with **34 successful HTTP responses and no failed requests**. Current release checks and the distinction from earlier hardware measurements are recorded in the [validation report](docs/validation.md).
 
@@ -38,6 +38,7 @@ The repository's **[Documents section](docs/README.md)** is the entry point for 
 | --- | --- |
 | [Getting started](docs/getting-started.md) | Download, first USB installation, home Wi-Fi setup and initial configuration |
 | [Hardware and wiring](docs/hardware.md) | Valve drivers, flyback protection, pin assignments, ADC addressing and board profiles |
+| [Environment sensor](docs/environment-sensor.md) | UMLIFE AHT20 + BMP280 wiring, air readings, placement and future soil-temperature considerations |
 | [Troubleshooting](docs/troubleshooting.md) | Hotspot passwords, Google mesh, connection diagnostics, startup and recovery |
 | [Commissioning](docs/commissioning.md) | Physical checks and network soak required before unattended watering |
 | [Updates and rollback](docs/ota.md) | Standalone GitHub updates, previous releases, optional LAN mirror and recovery |
@@ -78,6 +79,11 @@ The hostname is `planter`; automatic `planter.local` resolution depends on firmw
 ## Normal operation and configuration
 
 Use the dashboard to map each soil zone to its ADC channel and valves, calibrate dry/wet readings, then set its dry threshold, wet target and run duration. Configure daily schedules separately. Manual zone or all-valve actions run mapped valves sequentially; **Stop all** cancels pending runs and moisture recheck cycles. Saving settings can stop and cancel queued watering, and hardware/pin changes require a reboot.
+
+The **At the planter** panel shows air temperature in ?F and ?C, air humidity
+and station pressure in hPa. Connect the optional AHT20/BMP280 module to the
+existing 3.3V I2C bus; see the [wiring guide](docs/environment-sensor.md). These
+readings describe the air, not root-zone soil temperature.
 
 Each growing-zone panel brings its moisture reading, sensor commands, watering
 duration and mapped valve controls together. The speedometer-style dial has a
@@ -144,7 +150,7 @@ Use Python 3.10+ and Node.js 22+. From a new checkout:
 git clone https://github.com/okayaleh/ESP32-watering-rebuild.git
 cd ESP32-watering-rebuild
 python -m pip install -r requirements-dev.txt
-python tools/build.py --version 2.0.0-rebuild.8
+python tools/build.py --version 2.0.0-rebuild.9
 python tools/check.py
 ```
 

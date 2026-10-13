@@ -56,6 +56,44 @@ async function run(code){return vm.runInContext(code,sandbox);}
 async function fire(id,type='click'){for(const fn of ids.get(id).listeners[type]||[])await fn({preventDefault(){},currentTarget:ids.get(id)});if(ids.get('toast').className.includes('error'))throw Error(ids.get('toast').textContent);}
 async function clickElement(element){assert.ok(element,'Expected a control in its zone panel');for(const fn of element.listeners.click||[])await fn({preventDefault(){},currentTarget:element});if(ids.get('toast').className.includes('error'))throw Error(ids.get('toast').textContent);}
 function buttonWithin(element,label){return element.all().find(child=>child.tagName==='BUTTON'&&child.textContent===label);}
+async function auditEnvironment(){
+  const snapshot=await run('({status:model.status,settings:model.settings,online:model.online})');
+  const metrics=()=>Object.fromEntries(ids.get('environment').children.map(element=>[element.children[0].textContent,element.children[1].textContent]));
+  const setEnvironment=async(env,rainPin=null)=>{sandbox.environmentFixture=env;sandbox.environmentRainPin=rainPin;await run('model.online=true;model.status={...model.status,env:environmentFixture};model.settings={...model.settings,hardware:{...model.settings.hardware,rain_sensor_pin:environmentRainPin}};renderEnvironment()');};
+  try{
+    assert.equal([...source.matchAll(/id="environment"/g)].length,1);
+    assert.ok(source.indexOf('id="environment-title"')<source.indexOf('<h2>Growing zones</h2>'),'Planter readings must be visible above zones');
+    assert.ok(source.indexOf('id="environment-title"')<source.indexOf('<details class="section-fold" id="history-tools"'),'Planter readings must not be tucked inside the history fold');
+    assert.match(source,/Air temperature, not soil temperature/);assert.match(source,/about every 30 seconds and pause during watering/);
+    await setEnvironment({temperature_c:24.6,bmp_temperature_c:27,humidity_percent:57,pressure_hpa:1015.2,errors:{}});
+    assert.deepEqual(metrics(),{'Air temperature':'76.3 °F · 24.6 °C','Air humidity':'57 % RH','Station pressure':'1,015.2 hPa'});
+    assert.equal(ids.get('environment-status').textContent,'Readings available');assert.equal(ids.get('environment-detail').hidden,true);assert.equal(ids.get('environment-rain-note').hidden,true);
+    await setEnvironment({temperature_c:0,humidity_percent:0,pressure_hpa:1000});
+    assert.equal(metrics()['Air temperature'],'32 °F · 0 °C');assert.equal(metrics()['Air humidity'],'0 % RH');assert.equal(ids.get('environment-status').textContent,'Readings available');
+    await setEnvironment({temperature_c:-40,humidity_percent:100,pressure_hpa:980});assert.equal(metrics()['Air temperature'],'-40 °F · -40 °C');
+    // Missing or malformed values must never become zero humidity or 32°F.
+    for(const invalid of [undefined,null,'',false,'0','24.6',NaN,Infinity,-Infinity]){
+      await setEnvironment({temperature_c:invalid,bmp_temperature_c:invalid,humidity_percent:invalid,pressure_hpa:invalid});
+      assert.deepEqual(Object.values(metrics()),['—','—','—']);assert.equal(ids.get('environment-status').textContent,'No readings');assert.match(ids.get('environment-detail').textContent,/Waiting/);
+    }
+    await setEnvironment({});assert.equal(ids.get('environment-status').textContent,'No readings');
+    await setEnvironment({temp_c:12,humidity:25,pressure_hpa:990});assert.equal(metrics()['Air temperature'],'53.6 °F · 12 °C');assert.equal(metrics()['Air humidity'],'25 % RH','Legacy API aliases remain supported');
+    await setEnvironment({temperature_c:22,humidity_percent:60,pressure_hpa:null});
+    assert.equal(ids.get('environment-status').textContent,'Partial readings');assert.match(ids.get('environment-detail').textContent,/Unavailable: station pressure/);assert.doesNotMatch(ids.get('environment-detail').textContent,/sensor error/i);
+    await setEnvironment({temperature_c:null,bmp_temperature_c:26,humidity_percent:null,pressure_hpa:1002,errors:{aht20:'<img src=x onerror=alert(1)>'}});
+    assert.equal(metrics()['Air temperature'],'78.8 °F · 26 °C');assert.equal(metrics()['Air humidity'],'—');assert.equal(metrics()['Station pressure'],'1,002 hPa');
+    assert.equal(ids.get('environment-status').textContent,'Partial readings · sensor error');assert.match(ids.get('environment-detail').textContent,/Temperature from pressure sensor \(BMP280\)/);assert.match(ids.get('environment-detail').textContent,/AHT20: <img src=x/);assert.equal(ids.get('environment-detail').children.length,0,'Sensor errors must render as literal text');
+    await setEnvironment({errors:{bmp280:'Read failed'}});assert.equal(ids.get('environment-status').textContent,'Sensor error');assert.match(ids.get('environment-detail').textContent,/BMP280: Read failed/);
+    // An invalid AHT value may still fall back to a valid BMP value, including zero.
+    await setEnvironment({temperature_c:NaN,bmp_temperature_c:0,pressure_hpa:1010});assert.equal(metrics()['Air temperature'],'32 °F · 0 °C');assert.match(ids.get('environment-detail').textContent,/BMP280/);
+    await setEnvironment({temperature_c:22,humidity_percent:60,pressure_hpa:1000,rain:false});assert.equal(metrics().Rain,'Dry');assert.equal(ids.get('environment-rain-note').hidden,false);
+    await setEnvironment({rain:true});assert.equal(metrics().Rain,'Detected');
+    await setEnvironment({rain:null},0);assert.equal(metrics().Rain,'—','Configured GPIO zero must preserve the rain readout');
+    await setEnvironment({rain:null,errors:{rain:'Input failed'}});assert.equal(metrics().Rain,'—');assert.match(ids.get('environment-detail').textContent,/Rain sensor: Input failed/);
+    await setEnvironment({temperature_c:20,humidity_percent:50,pressure_hpa:1000});await run('model.online=false;renderEnvironment()');
+    assert.equal(ids.get('environment-status').textContent,'Controller offline');assert.match(ids.get('environment-detail').textContent,/Last received readings/);assert.equal(metrics()['Air temperature'],'68 °F · 20 °C');
+  }finally{sandbox.environmentRestore=snapshot;await run('Object.assign(model,environmentRestore);renderEnvironment()');}
+}
 async function auditSensorAssignments(){
   const snapshot=await run('({zones:model.zones,settings:model.settings})');
   try{
@@ -316,6 +354,8 @@ async function auditManualLimits(){
       assert.equal(await run('JSON.stringify(updateAudit[1].body)'),'{}');
       assert.equal(await run('updateAudit.length'),2,'Checks must not trigger an installation');
     }finally{await run('post=savedUpdatePost');sandbox.restoredUpdateStatus=JSON.parse(originalStatus);await run('model.status=restoredUpdateStatus;renderUpdate()');}
+    await auditEnvironment();
+    console.log(JSON.stringify({environment:'passed',checks:['always visible above zones','dual temperature units','AHT preferred and BMP fallback identified','zero and negative temperatures remain valid','missing and malformed values stay unavailable','partial readings and literal sensor errors','optional rain retained','offline readings identified']},null,2));
     await auditSensorAssignments();
     await auditCompactZones();
     await auditManualLimits();
@@ -324,8 +364,20 @@ async function auditManualLimits(){
     failNext=true;
     await run("Promise.allSettled([request('/api/status'),request('/api/settings'),request('/api/events')])");
     assert.equal(maximum,1);
+    // A real polling failure must identify retained environment readings as
+    // offline, and the next successful poll must clear that stale status.
+    const retainedEnvironment=ids.get('environment').textContent;
+    assert.equal(ids.get('environment-status').textContent,'Readings available');
+    failNext=true;await run('tick()');
+    assert.equal(await run('model.online'),false);
+    assert.equal(ids.get('environment-status').textContent,'Controller offline');
+    assert.match(ids.get('environment-detail').textContent,/Last received readings/);
+    assert.equal(ids.get('environment').textContent,retainedEnvironment,'Polling failure must preserve the last received measurements');
     await run("Promise.all([tick(),tick(),refreshStatus(),loadHistory()])");
     assert.equal(maximum,1);
+    assert.equal(await run('model.online'),true);assert.equal(ids.get('environment-status').textContent,'Readings available');
+    assert.equal(ids.get('environment-detail').hidden,true);
+    console.log(JSON.stringify({environmentPolling:'passed',checks:['failed poll marks retained measurements offline','successful poll restores environment status']},null,2));
     // A stop action must cancel a stalled history GET, wait for its cleanup,
     // then write through the same queue without marking the controller offline.
     const startedRead=new Promise(resolve=>{readStarted=resolve;});

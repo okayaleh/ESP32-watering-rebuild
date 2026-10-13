@@ -1,5 +1,5 @@
 {
-  "version": "2.0.0-rebuild.8",
+  "version": "2.0.0-rebuild.9",
   "mpy": "6.3",
   "files": [
     {
@@ -35,8 +35,8 @@
     {
       "name": "env_sensors.mpy",
       "path": "build/env_sensors.mpy",
-      "size": 2136,
-      "sha256": "d25adb1ccf5499616af1118f2043945ac97722c32b9b0df76c47ce95c2afac19"
+      "size": 2196,
+      "sha256": "5875803f70d9fcaadbd024e7b01f6a53d151cd49b1bd2ef6f81abbb725ae69fa"
     },
     {
       "name": "github_trust.mpy",
@@ -119,20 +119,20 @@
     {
       "name": "index.html",
       "path": "build/index.html",
-      "size": 82444,
-      "sha256": "0d7602b18d629cba4983235a185479e6155a311229b864b6478cbf5399ea08ee"
+      "size": 84944,
+      "sha256": "6a23af43392005fe11de0a1db798071bc7d40b2e84fa2dadbb108213d78a77d6"
     },
     {
       "name": "index.html.gz",
       "path": "build/index.html.gz",
-      "size": 24244,
-      "sha256": "b987aadcd0177dd5119644b2c705280e6eb5cdd7d672e211729237aa8518692a"
+      "size": 24988,
+      "sha256": "75168a41712b5185090cd8c57d0b249887c4c8822dbe2fee1e8a00b00de89a35"
     },
     {
       "name": "version.json",
       "path": "build/version.json",
       "size": 31,
-      "sha256": "ee979148c883024786ab6a0b6373d7672d654ed114ec91348ce2bd728a98f25d"
+      "sha256": "a6cd3a9938e0cb2ec33a05feb38bfb07a7c49ad4fd4a4c5b8917ea519651bd55"
     }
   ],
   "platform": "planter-esp32-romfs-mpy6",

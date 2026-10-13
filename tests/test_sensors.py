@@ -100,6 +100,51 @@ class MuxBus(Bus):
         return struct.pack(">h", conversion[0])
 
 
+class EnvironmentBus:
+    """Independent sensor replies, including Bosch's compensation vector."""
+    CALIBRATION = (27504, 26435, -1000, 36477, -10685, 3024,
+                   2855, 140, -7, 15500, -14600, 6000)
+    BMP_SAMPLE = bytes((0x65, 0x5a, 0xc0, 0x7e, 0xed, 0x00))
+
+    def __init__(self, bmp_address=0x76):
+        self.found = [0x38, bmp_address]
+        self.calls = []
+        self.fail = set()
+        self.aht_status = 0x08
+        # 50% RH and 25 C, with the AHT20 status byte and CRC.
+        frame = bytes((0x08, 0x80, 0, 0x06, 0, 0))
+        self.aht_frame = frame + bytes((aht_crc(frame),))
+        self.bmp_id = 0x58
+        self.calibration = self.CALIBRATION
+
+    def _call(self, method, address, *args):
+        self.calls.append((method, address) + args)
+        if address not in self.found or address in self.fail:
+            raise OSError("Environment sensor disconnected")
+
+    def readfrom(self, address, count):
+        self._call("read", address, count)
+        return bytes((self.aht_status,)) if count == 1 else self.aht_frame
+
+    def writeto(self, address, data):
+        self._call("write", address, data)
+        if data == b"\xbe\x08\x00":
+            self.aht_status = 0x08
+
+    def readfrom_mem(self, address, register, count):
+        self._call("read_mem", address, register, count)
+        if register == 0xd0:
+            return bytes((self.bmp_id,))
+        if register == 0x88:
+            return struct.pack("<HhhHhhhhhhhh", *self.calibration)
+        if register == 0xf7:
+            return self.BMP_SAMPLE
+        raise AssertionError("Unexpected environment register")
+
+    def writeto_mem(self, address, register, data):
+        self._call("write_mem", address, register, data)
+
+
 def settings(channels=None):
     return {"hardware": {"zone_channels": channels or {"bed": 0},
                          "ads1115_addresses": [0x48, 0x49, 0x4a, 0x4b],
@@ -260,6 +305,129 @@ class SensorTests(unittest.TestCase):
         drive(sensors)
         self.assertFalse(bus.reads)
         self.assertFalse(bus.writes)
+
+    def test_combined_environment_reads_both_bmp_addresses_incrementally(self):
+        for address in (0x76, 0x77):
+            with self.subTest(bmp_address=address):
+                bus = EnvironmentBus(address)
+                sensors = EnvSensors(bus, lambda: bus.found)
+                for now in range(0, 500, 10):
+                    before = len(bus.calls)
+                    sensors.poll(now)
+                    self.assertLessEqual(len(bus.calls) - before, 1)
+                self.assertEqual(sensors.readings["temperature_c"], 25.0)
+                self.assertEqual(sensors.readings["humidity_percent"], 50.0)
+                self.assertEqual(sensors.readings["pressure_hpa"], 1006.5)
+                self.assertEqual(sensors.readings["bmp_temperature_c"], 25.1)
+                self.assertEqual(sensors.readings["errors"], {})
+                self.assertIn(("write", 0x38, b"\xac\x33\x00"), bus.calls)
+                self.assertIn(("write_mem", address, 0xf4, b"\x25"), bus.calls)
+                count = len(bus.calls)
+                drive(sensors, start=500, end=30000, step=100)
+                self.assertEqual(len(bus.calls), count)
+
+    def test_uncalibrated_aht_initializes_and_waits_without_blocking(self):
+        bus = EnvironmentBus()
+        bus.found = [0x38]
+        bus.aht_status = 0
+        sensors = EnvSensors(bus, lambda: bus.found)
+        sensors.poll(0)  # Queue the device.
+        sensors.poll(1)  # Read the uncalibrated status.
+        sensors.poll(2)  # Initialize, then wait 10 ms before triggering.
+        self.assertEqual(bus.calls[-1], ("write", 0x38, b"\xbe\x08\x00"))
+        count = len(bus.calls)
+        sensors.poll(11)
+        self.assertEqual(len(bus.calls), count)
+        sensors.poll(12)
+        self.assertEqual(bus.calls[-1], ("write", 0x38, b"\xac\x33\x00"))
+        count = len(bus.calls)
+        sensors.poll(96)
+        self.assertEqual(len(bus.calls), count)
+        self.assertIsNone(sensors.readings["humidity_percent"])
+        sensors.poll(97)
+        self.assertEqual(sensors.readings["humidity_percent"], 50.0)
+
+    def test_aht_crc_error_isolated_and_recovers_next_interval(self):
+        bus = EnvironmentBus()
+        valid_frame = bus.aht_frame
+        bus.aht_frame = valid_frame[:-1] + bytes((valid_frame[-1] ^ 1,))
+        sensors = EnvSensors(bus, lambda: bus.found, interval_ms=1000)
+        drive(sensors, end=500, step=10)
+        self.assertIsNone(sensors.readings["temperature_c"])
+        self.assertIsNone(sensors.readings["humidity_percent"])
+        self.assertIn("CRC", sensors.readings["errors"]["aht20"])
+        self.assertEqual(sensors.readings["pressure_hpa"], 1006.5)
+        bus.aht_frame = valid_frame
+        drive(sensors, start=1000, end=1500, step=10)
+        self.assertEqual(sensors.readings["temperature_c"], 25.0)
+        self.assertEqual(sensors.readings["humidity_percent"], 50.0)
+        self.assertEqual(sensors.readings["errors"], {})
+
+    def test_environment_disappearing_mid_queue_clears_cached_readings(self):
+        bus = EnvironmentBus()
+        sensors = EnvSensors(bus, lambda: bus.found, interval_ms=1000)
+        drive(sensors, end=500, step=10)
+        self.assertEqual(sensors.readings["pressure_hpa"], 1006.5)
+        sensors.poll(1000)  # Both devices were present when queued.
+        bus.found = []
+        count = len(bus.calls)
+        sensors.poll(1010)
+        self.assertIsNone(sensors.readings["temperature_c"])
+        self.assertIsNone(sensors.readings["humidity_percent"])
+        sensors.poll(1020)
+        self.assertIsNone(sensors.readings["pressure_hpa"])
+        self.assertIsNone(sensors.readings["bmp_temperature_c"])
+        self.assertFalse(sensors.calibration)
+        self.assertEqual(len(bus.calls), count)
+
+    def test_bmp_replacement_after_absent_cycle_reads_new_factory_trims(self):
+        bus = EnvironmentBus()
+        sensors = EnvSensors(bus, lambda: bus.found, interval_ms=1000)
+        drive(sensors, end=500, step=10)
+        bus.found = [0x38]
+        drive(sensors, start=1000, end=1500, step=10)
+        self.assertIsNone(sensors.readings["pressure_hpa"])
+        self.assertFalse(sensors.calibration)
+        replacement = list(bus.calibration)
+        replacement[3] += 1000
+        bus.calibration = tuple(replacement)
+        bus.found.append(0x76)
+        drive(sensors, start=2000, end=2500, step=10)
+        self.assertEqual(sensors.calibration[0x76], bus.calibration)
+        self.assertEqual(bus.calls.count(("read_mem", 0x76, 0x88, 24)), 2)
+        expected = bmp_compensate(bus.BMP_SAMPLE, bus.calibration)[1] / 100
+        self.assertEqual(sensors.readings["pressure_hpa"], round(expected, 1))
+        self.assertNotEqual(sensors.readings["pressure_hpa"], 1006.5)
+
+    def test_bmp_transaction_error_isolated_and_recovers_with_fresh_trims(self):
+        bus = EnvironmentBus()
+        sensors = EnvSensors(bus, lambda: bus.found, interval_ms=1000)
+        drive(sensors, end=500, step=10)
+        bus.fail.add(0x76)
+        drive(sensors, start=1000, end=1500, step=10)
+        self.assertIn("bmp280", sensors.readings["errors"])
+        self.assertIsNone(sensors.readings["pressure_hpa"])
+        self.assertIsNone(sensors.readings["bmp_temperature_c"])
+        self.assertEqual(sensors.readings["temperature_c"], 25.0)
+        self.assertFalse(sensors.calibration)
+        bus.fail.clear()
+        drive(sensors, start=2000, end=2500, step=10)
+        self.assertEqual(sensors.readings["pressure_hpa"], 1006.5)
+        self.assertEqual(sensors.readings["errors"], {})
+        self.assertEqual(bus.calls.count(("read_mem", 0x76, 0x88, 24)), 2)
+
+    def test_wrong_bmp_chip_id_is_rejected_and_can_recover(self):
+        bus = EnvironmentBus()
+        bus.bmp_id = 0x60  # A BME280 needs a different driver.
+        sensors = EnvSensors(bus, lambda: bus.found, interval_ms=1000)
+        drive(sensors, end=500, step=10)
+        self.assertIsNone(sensors.readings["pressure_hpa"])
+        self.assertIn("not a BMP280", sensors.readings["errors"]["bmp280"])
+        self.assertFalse(sensors.calibration)
+        bus.bmp_id = 0x58
+        drive(sensors, start=1000, end=1500, step=10)
+        self.assertEqual(sensors.readings["pressure_hpa"], 1006.5)
+        self.assertEqual(sensors.readings["errors"], {})
 
     def test_aht_crc_vector(self):
         # Sensirion polynomial 0x31, initial 0xff, also used by AHT20.

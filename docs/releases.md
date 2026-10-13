@@ -3,6 +3,26 @@
 [Documents](README.md) · [Updates and rollback](ota.md) ·
 [All GitHub releases](https://github.com/okayaleh/ESP32-watering-rebuild/releases)
 
+## 2.0.0-rebuild.9 ? visible planter environment readings
+
+- **At the planter** now stays visible above the watering zones. It shows
+  air temperature in ?F and ?C, relative humidity in % RH and station
+  pressure in hPa. Rain remains visible when configured or reported.
+- Missing, partial and failed readings have explicit status; missing values
+  are not converted to zero or 32?F. A BMP280 temperature fallback is
+  identified when the AHT20 temperature is unavailable.
+- Environmental drivers clear readings when a sensor disappears during a
+  queued measurement and reload BMP280 compensation data after reconnection.
+- The new [environment sensor guide](environment-sensor.md) documents 3.3V
+  wiring alongside the ADS1115, expected I2C addresses, placement and the
+  distinction between air readings and soil temperature.
+
+Existing AHT20/BMP280 support is automatic; no new zone or ADC input is needed.
+Normal environment sampling remains approximately every 30 seconds while
+watering is idle. This release adds no shade actuator control. Application
+OTA preserves garden settings, Wi-Fi and calibration; the native platform
+and boot helpers are unchanged. The channel retains .9, .8 and .7.
+
 ## 2.0.0-rebuild.8 — measured or entered calibration limits
 
 - Each zone panel displays editable **Dry raw · 0%** and **Wet raw · 100%**

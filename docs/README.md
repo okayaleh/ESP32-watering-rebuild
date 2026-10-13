@@ -16,6 +16,7 @@ guides and the selected release's compatibility notes before installation.
 | --- | --- |
 | Install the firmware, connect Wi-Fi and configure the first garden | [Getting started](getting-started.md) |
 | Choose pins, wire valves and connect moisture/environment sensors | [Hardware and board configuration](hardware.md) |
+| Connect an AHT20 + BMP280 air sensor and view local readings | [Environment sensor guide](environment-sensor.md) |
 | Resolve setup, connection, settings, sensor or restart problems | [Troubleshooting](troubleshooting.md) |
 | Verify the actual valves, wiring and network before unattended use | [Commissioning checklist](commissioning.md) |
 | Set up standalone GitHub updates or select a previous compatible release | [Updates, retention and recovery](ota.md) |

@@ -21,6 +21,14 @@ All four possible ADS1115 boards use the **same two wires**. Select addresses wi
 
 For WROOM-32, assign outputs only to 4,5,13,14,16,17,18,19,21,22,23,25,26,27,32,33. The validator excludes flash, UART, unbonded and boot-strapping pins for user assignments. GPIO34,35,36,39 are input-only and have no internal pull-up. GPIO2 is reserved for the configured onboard LED. This is more conservative than the old project's advice about using strapping outputs after boot.
 
+## AHT20 + BMP280 environment module
+
+For a UMLIFE **AHT20 + BMP280** module on the classic ESP32, share the
+existing 3.3V, GND, GPIO21/SDA and GPIO22/SCL connections with the ADS1115.
+No ADC or voltage adapter is needed at 3.3V. See the
+[environment sensor wiring and placement guide](environment-sensor.md)
+before connecting it. It measures air conditions, not soil temperature.
+
 ## ESP32-S3-WROOM-1 N16R8
 
 Use a MicroPython variant compatible with the board's flash and octal PSRAM. Before building, edit `src/config.py`:

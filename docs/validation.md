@@ -1,5 +1,22 @@
 # Validation report
 
+## 2.0.0-rebuild.9 — visible environmental readings
+
+Validation on **2026-10-13** covers the always-visible environmental panel
+and removal/reconnection handling for AHT20/BMP280 sensors.
+
+| Check | Result and scope |
+| --- | --- |
+| Host suite | All 249 tests passed in 20.323 seconds. Seven new environmental state-machine tests cover complete reads at both BMP280 addresses, AHT20 initialization and timing, one I2C transaction per poll, CRC and transaction errors, removal, replacement calibration and recovery. These use simulated I2C. |
+| Dashboard audit | All 80 named checks passed: the existing 70 plus eight environmental presentation cases and two real polling failure/recovery cases. Coverage includes missing/invalid values, legitimate zero values, partial readings, BMP temperature fallback, literal error text and optional rain. |
+| Real Chrome | Light/dark views at widths 1280, 390 and 320 had no horizontal overflow or page JavaScript errors. Missing-sensor and partial/error states were also checked. Screenshots were inspected. |
+| Artifacts | 22 OTA files; dashboard HTML 84,944 bytes and gzip 24,988 bytes. Native platform and boot helpers are unchanged. |
+| Existing board before installation | Firmware .8 was online, all three moisture zones reported readings, and both automatic watering modes were disabled. A completed I2C scan found only the ADS1115 at 0x48. Environmental values were unavailable; no physical AHT20/BMP280 measurements were verified. |
+
+The new module must be connected before its physical readings, placement and
+accuracy can be checked. The mock tests do not establish accuracy of the
+user's module or soil temperature. Shade actuation is not implemented.
+
 ## 2.0.0-rebuild.8 — measured or entered raw limits
 
 Validation on **2026-10-11** covers the visible per-zone raw-limit fields,
@@ -15,6 +32,19 @@ targeted manual calibration saves and coexistence with measured capture.
 
 These host and simulator checks do not establish sensor accuracy or physical
 reference conditions. No new dry/wet reference was measured for this change.
+
+### Published .8 release and board acceptance
+
+The .8 release at commit `5392813ef26cb541a5a83fa9e7ce5c55ad38f5e8`
+passed all three GitHub workflows and was installed from GitHub on October 11.
+The board restarted on .8, rejoined Wi-Fi and served dashboard bytes matching
+the verified build. Garden settings matched the pre-update export exactly.
+The new manual-save endpoint accepted the existing saved pair without
+changing any settings. Both automatic modes were disabled, sampled valves
+were closed and no safety fault was reported. The monitor observed two
+transient connection failures around the update; these checks are not a
+network soak. A subsequent October 13 read showed all three moisture zones
+returning values. Private evidence: `manual-limits-board-acceptance.json`.
 
 ## 2.0.0-rebuild.7 — explicit sensor inputs and fresh readings
 

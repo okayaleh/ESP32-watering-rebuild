@@ -55,6 +55,16 @@ class EnvSensors:
                 pin_class = Pin
             self.rain_pin = pin_class(rain_pin, pin_class.IN)
 
+    def _clear_sensor(self, addr):
+        if addr == 0x38:
+            self.readings["temperature_c"] = None
+            self.readings["humidity_percent"] = None
+        else:
+            # A replacement at the same address has its own factory trims.
+            self.calibration.pop(addr, None)
+            self.readings["pressure_hpa"] = None
+            self.readings["bmp_temperature_c"] = None
+
     def poll(self, now_ms):
         if not self.queue:
             if ticks_diff(now_ms, self.next_cycle) < 0:
@@ -71,16 +81,17 @@ class EnvSensors:
             if 0x38 in found:
                 self.queue.append([0x38, "aht_status", now_ms])
             else:
-                self.readings["humidity_percent"] = None
-                self.readings["temperature_c"] = None
+                self._clear_sensor(0x38)
+            for addr in (0x76, 0x77):
+                if addr not in found:
+                    self.calibration.pop(addr, None)
             for addr in (0x76, 0x77):
                 if addr in found:
                     stage = "bmp_start" if addr in self.calibration else "bmp_id"
                     self.queue.append([addr, stage, now_ms])
                     break
             else:
-                self.readings["pressure_hpa"] = None
-                self.readings["bmp_temperature_c"] = None
+                self._clear_sensor(0x76)
             return
         addr, stage, due = self.queue[0]
         if ticks_diff(now_ms, due) < 0:
@@ -88,6 +99,7 @@ class EnvSensors:
         found = self.present() if callable(self.present) else self.present
         if addr not in found:
             self.queue.pop(0)
+            self._clear_sensor(addr)
             return
         try:
             if stage == "aht_status":
@@ -133,10 +145,4 @@ class EnvSensors:
             self.queue.pop(0)
             sensor = "aht20" if addr == 0x38 else "bmp280"
             self.readings["errors"][sensor] = str(exc)
-            if addr == 0x38:
-                self.readings["temperature_c"] = None
-                self.readings["humidity_percent"] = None
-            else:
-                self.calibration.pop(addr, None)
-                self.readings["pressure_hpa"] = None
-                self.readings["bmp_temperature_c"] = None
+            self._clear_sensor(addr)
