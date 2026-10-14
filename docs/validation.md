@@ -17,6 +17,34 @@ The new module must be connected before its physical readings, placement and
 accuracy can be checked. The mock tests do not establish accuracy of the
 user's module or soil temperature. Shade actuation is not implemented.
 
+### Published .9 release and board acceptance
+
+All three GitHub workflows passed for commit
+`f408cef57c0659c446aed02002baa8eed1d8d862`; the standalone channel retains
+.9, .8 and .7. The controller's automatic updater installed .9 and restarted.
+LAN verification confirmed .9, connected Wi-Fi, closed valve outputs and
+dashboard bytes matching the build (SHA-256
+`6a23af43392005fe11de0a1db798071bc7d40b2e84fa2dadbb108213d78a77d6`).
+Three configured zone panels and their six raw calibration fields remained
+present. No garden configuration changes were requested for this update.
+
+Real Chrome checks against the ESP32 passed at 1280 and 390 pixels wide in
+light/dark themes, with no horizontal overflow or page errors. The new panel
+was visible and correctly reported **No readings**.
+
+Physical sensor verification remains blocked: during the update attempt,
+the board restarted while still running .8 (boot event `Reset cause 1`) and
+reported `I2C line held low after bus recovery`. At that point moisture and
+environmental readings were both unavailable. The same bus condition remained
+after .9 installed; it therefore predates activation of the .9 drivers. The
+user confirmed the new AHT20/BMP280 module was **not connected**. Power and
+wiring checks on the existing shared bus are required before adding it. This
+observation does not identify which wire or device is holding the bus low.
+
+The first installation monitor expired after the intervening restart; the
+subsequent observation verified the automatic installation. Private evidence:
+`environment-board-acceptance.json` and `environment-board-browser.json`.
+
 ## 2.0.0-rebuild.8 — measured or entered raw limits
 
 Validation on **2026-10-11** covers the visible per-zone raw-limit fields,
